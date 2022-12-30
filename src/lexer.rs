@@ -1,8 +1,7 @@
 use std::{iter::Peekable, str::Chars};
 use crate::token::{Token, KEYWORDS};
 
-struct Lexer<'a> {
-    code: &'a str,
+pub struct Lexer<'a> {
     chars: Peekable<Chars<'a>>,
 }
 
@@ -73,7 +72,7 @@ impl<'a> Iterator for Lexer<'a> {
 
 impl<'a> Lexer<'a> {
     pub fn new(code: &'a str) -> Lexer<'a> {
-        Lexer { code, chars: code.chars().peekable() }
+        Lexer { chars: code.chars().peekable() }
     }
 
     pub fn read_char(&mut self) {
