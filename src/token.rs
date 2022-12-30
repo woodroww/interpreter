@@ -38,6 +38,39 @@ pub enum Token {
     Return,
 }
 
+impl Token {
+    pub fn literal(&self) -> &'static str {
+        match self {
+            Token::Illegal => "ILLEGAL",
+            Token::Ident(_) => "IDENT",
+            Token::Int(_) => "INT",
+            Token::Assign => "=",
+            Token::Plus => "+",
+            Token::Minus => "-",
+            Token::Slash => "/",
+            Token::Asterisk => "*",
+            Token::Equal => "==",
+            Token::Bang => "!",
+            Token::NotEqual => "!=",
+            Token::LessThan => "<",
+            Token::GreaterThan => ">",
+            Token::Comma => ",",
+            Token::Semicolon => ";",
+            Token::Lparen => "(",
+            Token::Rparen => ")",
+            Token::Lbrace => "{",
+            Token::Rbrace => "}",
+            Token::Function => "FUNCTION",
+            Token::Let => "LET",
+            Token::True => "TRUE",
+            Token::False => "FALSE",
+            Token::If => "IF",
+            Token::Else => "ELSE",
+            Token::Return => "RETURN",
+        }
+    }
+}
+
 pub static KEYWORDS: phf::Map<&'static str, Token> = phf::phf_map! {
     "fn" => Token::Function,
     "let" => Token::Let,
