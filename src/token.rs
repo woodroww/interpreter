@@ -38,6 +38,12 @@ pub enum Token {
     Return,
 }
 
+impl std::fmt::Display for Token {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.literal())
+    }
+}
+
 impl Token {
     pub fn literal(&self) -> String {
         match self {
