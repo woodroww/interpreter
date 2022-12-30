@@ -1,6 +1,6 @@
 use crate::{
     ast::{Identifier, LetStatement, NodeInterface},
-    ast::{Program, Statement},
+    ast::{Program, Statement, StatementInterface},
     lexer::Lexer,
     token::Token,
 };
@@ -28,16 +28,16 @@ impl<'a> Parser<'a> {
         self.peek_token = self.lexer.next();
     }
 
-    fn parse_program(&mut self) -> Option<Program> {
-        let mut program = Program::new();
-        if let Some(token) = &self.current_token {
+    fn parse_program(&mut self) -> Option<Program<LetStatement>> {
+        let mut program: Program<LetStatement> = Program::new();
+        while let Some(token) = &self.current_token {
             let statement = self.parse_statement();
             if let Some(statement) = statement {
                 program.statements.push(statement);
             }
+            self.next_token();
         }
-
-        todo!()
+        Some(program)
     }
 
     fn parse_statement(&mut self) -> Option<LetStatement> {
@@ -56,14 +56,15 @@ impl<'a> Parser<'a> {
         let mut statement = LetStatement::new(token.clone());
 
         //if self.expect_peek(Token::Ident(_)) {
-        if let Some(peek) = self.peek_token {
-            if let Token::Ident(ident) = peek {
+        if let Some(peek) = &self.peek_token {
+            if let Token::Ident(_ident) = peek {
                 self.next_token();
                 let id_token = self
                     .current_token
                     .clone()
                     .expect("is this the right token? is it Some? we've called next_token() above");
-                statement.name = Some(Identifier::new(id_token, id_token.literal().to_string()));
+                let literal = id_token.literal().to_string();
+                statement.name = Some(Identifier::new(id_token, literal));
                 if !self.expect_peek(Token::Assign) {
                     return None;
                 }
@@ -77,16 +78,16 @@ impl<'a> Parser<'a> {
     }
 
     fn peek_token_is(&self, token: Token) -> bool {
-        if let Some(t) = self.peek_token {
-            t == token
+        if let Some(t) = &self.peek_token {
+            *t == token
         } else {
             false
         }
     }
 
     fn current_token_is(&self, token: Token) -> bool {
-        if let Some(t) = self.current_token {
-            t == token
+        if let Some(t) = &self.current_token {
+            *t == token
         } else {
             false
         }
@@ -124,7 +125,13 @@ let foobar = 838383;
         // so this needs a test_let_statement helper function in this module
         // and there are more tests in the source code for the book
         for (statement, expected) in program.statements.iter().zip(expected) {
-            assert_eq!(statement.token_literal(), expected);
+            test_let_statement(statement, expected);
         }
+    }
+
+    fn test_let_statement(s: &LetStatement, name: &str) {
+        assert_eq!(s.token_literal(), "let");
+        assert_eq!(s.name.as_ref().unwrap().value, name);
+        assert_eq!(s.name.as_ref().unwrap().token_literal(), name)
     }
 }

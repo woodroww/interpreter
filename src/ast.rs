@@ -26,7 +26,7 @@ impl StatementInterface for Statement {
     }
 }
 
-struct Expression {
+pub struct Expression {
     node: Node,
 }
 
@@ -40,15 +40,24 @@ impl ExpressionInterface for Expression {
     }
 }
 
+impl Expression {
+    pub fn new() -> Self {
+        Self { node: Node }
+    }
+}
 // This Program node is going to be the root node of every AST our parser produces. Every valid
 // Monkey program is a series of statements. These statements are contained in the
 // Program.Statements, which is just a slice of AST nodes that implement the Statement interface.
 
-pub struct Program {
-    pub statements: Vec<Statement>,
+pub struct Program<T>
+    where
+        T: NodeInterface + StatementInterface {
+    pub statements: Vec<T>,
 }
 
-impl NodeInterface for Program {
+impl<T> NodeInterface for Program<T>
+    where
+        T: NodeInterface + StatementInterface {
     fn token_literal(&self) -> String {
         if self.statements.len() > 0 {
             self.statements[0].token_literal()
@@ -58,37 +67,53 @@ impl NodeInterface for Program {
     }
 }
 
-impl Program {
+impl<T> Program<T>
+    where
+        T: NodeInterface + StatementInterface {
     pub fn new() -> Self {
         Self { statements: Vec::new() }
     }
 }
 
+/*
+type LetStatement struct {
+    Token token.Token // the token.LET token
+    Name  *Identifier
+    Value Expression
+}
+*/
 pub struct LetStatement {
     pub token: Token,
     pub name: Option<Identifier>,
-}
-
-impl NodeInterface for LetStatement {
-    fn token_literal(&self) -> String {
-        todo!()
-    }
+    pub value: Expression,
 }
 
 impl LetStatement {
     pub fn new(token: Token) -> Self {
-        Self { token, name: None }
+        Self { token, name: None, value: Expression { node: Node }  }
+    }
+}
+
+impl StatementInterface for LetStatement {
+    fn statement_node() {
+        todo!()
+    }
+}
+
+impl NodeInterface for LetStatement {
+    fn token_literal(&self) -> String {
+        self.token.literal()
     }
 }
 
 pub struct Identifier {
-    token: Token,
-    value: String,
+    pub token: Token,
+    pub value: String,
 }
 
 impl NodeInterface for Identifier {
     fn token_literal(&self) -> String {
-        todo!()
+        self.token.literal()
     }
 }
 
