@@ -1,6 +1,7 @@
+use std::{rc::Rc, cell::RefCell, any::Any};
 use crate::{
     ast::{Identifier, LetStatement, NodeInterface},
-    ast::{Program, Statement, StatementInterface},
+    ast::{Program, Statement, StatementInterface, ReturnStatement, StatementType},
     lexer::Lexer,
     token::Token,
 };
@@ -34,8 +35,8 @@ impl<'a> Parser<'a> {
         self.peek_token = self.lexer.next();
     }
 
-    fn parse_program(&mut self) -> Option<Program<LetStatement>> {
-        let mut program: Program<LetStatement> = Program::new();
+    fn parse_program(&mut self) -> Option<Program> {
+        let mut program: Program = Program::new();
         while let Some(token) = &self.current_token {
             let statement = self.parse_statement();
             if let Some(statement) = statement {
@@ -46,19 +47,44 @@ impl<'a> Parser<'a> {
         Some(program)
     }
 
-    fn parse_statement(&mut self) -> Option<LetStatement> {
+    fn parse_statement(&mut self) -> Option<StatementType> {
         if self.current_token.is_none() {
             return None;
         }
         let token = self.current_token.as_ref().unwrap();
         match token {
             Token::Let => {
-                self.parse_let_statement()
+                let s = self.parse_let_statement();
+                if let Some(statement) = s {
+                    Some(StatementType::Let(statement))
+                } else {
+                    None
+                }
+            }
+            Token::Return => {
+                let s = self.parse_return_statement();
+                if let Some(statement) = s {
+                    Some(StatementType::Return(statement))
+                } else {
+                    None
+                }
             }
             _ => {
                 None
             }
         }
+    }
+
+    fn parse_return_statement(&mut self) -> Option<ReturnStatement> {
+        if self.current_token.is_none() {
+            return None;
+        }
+        let mut statement = ReturnStatement::new(self.current_token.as_ref().unwrap().clone());
+        self.next_token();
+        while !self.current_token_is(&Token::Semicolon) {
+            self.next_token();
+        }
+        Some(statement)
     }
 
     fn parse_let_statement(&mut self) -> Option<LetStatement> {
@@ -119,8 +145,8 @@ impl<'a> Parser<'a> {
     fn peek_error(&mut self, expected: &Token) {
         let peek = self.peek_token.as_ref().unwrap();
         let message = format!(
-            "expected next token to be {}, got {} instead",
-            expected, peek
+            "expected next token to be '{}, {}', got '{}, {}' instead",
+            expected.token_type(), expected, peek.token_type(), peek
         );
         self.errors.push(message);
     }
@@ -135,6 +161,24 @@ mod test {
 
     use super::*;
     use pretty_assertions::assert_eq;
+
+    fn test_let_statement(s: &LetStatement, name: &str) {
+        assert_eq!(s.token_literal(), "let");
+        assert_eq!(s.name.as_ref().unwrap().value, name);
+        assert_eq!(s.name.as_ref().unwrap().token_literal(), name)
+    }
+
+    fn check_parser_errors(parser: &Parser) -> Option<String> {
+        let errors = parser.errors();
+        if errors.len() == 0 {
+            return None;
+        }
+        let mut error_string = format!("parser has {} errors\n", errors.len());
+        for e in errors {
+            error_string.push_str(&format!("parser error: {}\n", e));
+        }
+        Some(error_string)
+    }
 
     #[test]
     fn test_let_statements() {
@@ -152,7 +196,11 @@ let foobar = 838383;
         // so this needs a test_let_statement helper function in this module
         // and there are more tests in the source code for the book
         for (statement, expected) in program.statements.iter().zip(expected) {
-            test_let_statement(statement, expected);
+            if let StatementType::Let(s) = statement {
+                test_let_statement(s, expected);
+            } else {
+                panic!();
+            }
         }
     }
 
@@ -173,21 +221,26 @@ let 838383;
         }
     }
 
-    fn test_let_statement(s: &LetStatement, name: &str) {
-        assert_eq!(s.token_literal(), "let");
-        assert_eq!(s.name.as_ref().unwrap().value, name);
-        assert_eq!(s.name.as_ref().unwrap().token_literal(), name)
-    }
+    #[test]
+    fn test_return_statements() {
+        let input = "
+return 5;
+return 10;
+return 993322;
+";
+        let lexer = Lexer::new(input);
+        let mut parser = Parser::new(lexer);
+        let program = parser.parse_program().unwrap();
+        let _error_string = check_parser_errors(&parser);
+        assert_eq!(program.statements.len(), 3);
 
-    fn check_parser_errors(parser: &Parser) -> Option<String> {
-        let errors = parser.errors();
-        if errors.len() == 0 {
-            return None;
+        let expected = vec!["x", "y", "foobar"];
+        for (statement, _expected) in program.statements.iter().zip(expected) {
+            if let StatementType::Return(s) = statement {
+                assert_eq!(s.token_literal(), "return");
+            } else {
+                panic!();
+            }
         }
-        let mut error_string = format!("parser has {} errors\n", errors.len());
-        for e in errors {
-            error_string.push_str(&format!("parser error: {}\n", e));
-        }
-        Some(error_string)
     }
 }

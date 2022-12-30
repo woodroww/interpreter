@@ -1,11 +1,18 @@
 use crate::token::Token;
 
+// -----------------------------------------------------------------------------
+//  Node
+// -----------------------------------------------------------------------------
+
 pub struct Node;
 
 pub trait NodeInterface {
     fn token_literal(&self) -> String;
 }
 
+// -----------------------------------------------------------------------------
+//  Statement 
+// -----------------------------------------------------------------------------
 pub struct Statement {
     node: Node,
 }
@@ -26,6 +33,10 @@ impl StatementInterface for Statement {
     }
 }
 
+// -----------------------------------------------------------------------------
+//  Expression
+// -----------------------------------------------------------------------------
+
 pub struct Expression {
     node: Node,
 }
@@ -45,36 +56,42 @@ impl Expression {
         Self { node: Node }
     }
 }
+// -----------------------------------------------------------------------------
+//  Program
+// -----------------------------------------------------------------------------
 // This Program node is going to be the root node of every AST our parser produces. Every valid
 // Monkey program is a series of statements. These statements are contained in the
 // Program.Statements, which is just a slice of AST nodes that implement the Statement interface.
 
-pub struct Program<T>
-    where
-        T: NodeInterface + StatementInterface {
-    pub statements: Vec<T>,
+pub enum StatementType {
+    Let(LetStatement),
+    Return(ReturnStatement),
 }
 
-impl<T> NodeInterface for Program<T>
-    where
-        T: NodeInterface + StatementInterface {
+pub struct Program {
+    pub statements: Vec<StatementType>,
+}
+
+impl NodeInterface for Program {
     fn token_literal(&self) -> String {
         if self.statements.len() > 0 {
-            self.statements[0].token_literal()
+            //self.statements[0].token_literal()
+            "I'm coming back for you baby!".to_string()
         } else {
             "".to_string()
         }
     }
 }
 
-impl<T> Program<T>
-    where
-        T: NodeInterface + StatementInterface {
+impl Program {
     pub fn new() -> Self {
         Self { statements: Vec::new() }
     }
 }
 
+// -----------------------------------------------------------------------------
+//  LetStatement
+// -----------------------------------------------------------------------------
 /*
 type LetStatement struct {
     Token token.Token // the token.LET token
@@ -105,6 +122,37 @@ impl NodeInterface for LetStatement {
         self.token.literal()
     }
 }
+
+// -----------------------------------------------------------------------------
+//  ReturnStatement
+// -----------------------------------------------------------------------------
+
+pub struct ReturnStatement {
+    pub token: Token,
+    pub return_value: Expression,
+}
+
+impl StatementInterface for ReturnStatement {
+    fn statement_node() {
+        todo!()
+    }
+}
+
+impl NodeInterface for ReturnStatement {
+    fn token_literal(&self) -> String {
+        self.token.literal()
+    }
+}
+
+impl ReturnStatement {
+    pub fn new(token: Token) -> Self {
+        Self { token, return_value: Expression { node: Node }  }
+    }
+}
+
+// -----------------------------------------------------------------------------
+// Identifier 
+// -----------------------------------------------------------------------------
 
 pub struct Identifier {
     pub token: Token,

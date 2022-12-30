@@ -75,6 +75,37 @@ impl Token {
             Token::Return => "return".to_string(),
         }
     }
+
+    pub fn token_type(&self) -> String {
+        match self {
+            Token::Illegal => "ILLEGAL".to_string(),
+            Token::Ident(_) => "IDENT".to_string(),
+            Token::Int(_) => "INT".to_string(),
+            Token::Assign => "ASSIGN".to_string(),
+            Token::Plus => "PLUS".to_string(),
+            Token::Minus => "MINUS".to_string(),
+            Token::Slash => "SLASH".to_string(),
+            Token::Asterisk => "ASTERISK".to_string(),
+            Token::Equal => "EQUAL".to_string(),
+            Token::Bang => "BANG".to_string(),
+            Token::NotEqual => "NOTEQUAL".to_string(),
+            Token::LessThan => "LESSTHAN".to_string(),
+            Token::GreaterThan => "GREATERTHAN".to_string(),
+            Token::Comma => "COMMA".to_string(),
+            Token::Semicolon => "SEMICOLON".to_string(),
+            Token::Lparen => "LPAREN".to_string(),
+            Token::Rparen => "RPAREN".to_string(),
+            Token::Lbrace => "LBRACE".to_string(),
+            Token::Rbrace => "RBRACE".to_string(),
+            Token::Function => "FUNCTION".to_string(),
+            Token::Let => "LET".to_string(),
+            Token::True => "TRUE".to_string(),
+            Token::False => "FALSE".to_string(),
+            Token::If => "IF".to_string(),
+            Token::Else => "ELSE".to_string(),
+            Token::Return => "RETURN".to_string(),
+        }
+    }
 }
 
 pub static KEYWORDS: phf::Map<&'static str, Token> = phf::phf_map! {
