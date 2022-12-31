@@ -73,7 +73,10 @@ impl Identifier {
 pub enum ExpressionType {
     NoExpression,
     Expression(Expression),
+
+    Identifier(Identifier),
     Prefix(PrefixExpression),
+    Int(usize),
 }
 
 impl std::fmt::Display for ExpressionType {
@@ -82,6 +85,8 @@ impl std::fmt::Display for ExpressionType {
             ExpressionType::NoExpression => "NoExpression",
             ExpressionType::Expression(_) => "Expression",
             ExpressionType::Prefix(_) => "Prefix",
+            ExpressionType::Identifier(_) => "Identifier",
+            ExpressionType::Int(_) => "Int",
         };
         write!(f, "ExpressionType::{}", out)
     }
@@ -114,9 +119,9 @@ impl Expression {
 }
 
 pub struct PrefixExpression {
-    token: Token, // Bang or Minus at this point
+    pub token: Token, // Bang or Minus at this point
     //operator: String,
-    right: Expression,
+    pub right: Expression,
 }
 
 impl PrefixExpression {
@@ -124,8 +129,8 @@ impl PrefixExpression {
         self.token.literal()
     }
 
-    pub fn new(token: Token, /*operator: String,*/ right: Expression) -> Self {
-        Self { token, /*operator,*/ right }
+    pub fn new(token: Token, /*operator: String,*/) -> Self {
+        Self { token, /*operator,*/ right: Expression::new() }
     }
 }
 

@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use crate::{
     ast::{
         Expression, ExpressionStatement, ExpressionType, Identifier, LetStatement, NodeInterface,
-        Program, ReturnStatement, StatementType,
+        Program, ReturnStatement, StatementType, PrefixExpression,
     },
     lexer::Lexer,
     token::Token,
@@ -49,11 +49,11 @@ impl<'a> Parser<'a> {
         result
     }
 
-    fn register_prefix<F>(&mut self, token: Token, f: PrefixFn) {
+    /*fn register_prefix<F>(&mut self, token: Token, f: PrefixFn) {
         self.prefix_fns.insert(token, f);
     }
 
-    /*fn register_infix(&mut self, token: Token, f: fn() -> Expression) {
+    fn register_infix(&mut self, token: Token, f: fn() -> Expression) {
         self.infix_fns.insert(token, f);
     }*/
 
@@ -103,19 +103,27 @@ impl<'a> Parser<'a> {
         None
     }
 
-    fn parse_identifier(&mut self, token: Token) -> Option<Identifier> {
-        Some(Identifier::new(self.current_token.clone().unwrap()))
+    fn parse_identifier(&mut self) -> Option<Identifier> {
+        Some(Identifier::new(self.current_clone()))
     }
 
     fn parse_expression(&mut self, precedence: Precedence) -> Option<ExpressionType> {
         // call parse_prefix for self.current_token
         // return result of that
-        match &self.current_token {
-            Some(token) => match token {
-                Token::Ident(_data) => Some(ExpressionType::Expression(Expression::new())),
-                _ => None,
-            },
-            None => None,
+        let token = self.current_clone();
+        match token {
+            Token::Ident(_data) => {
+                let ident = self.parse_identifier().unwrap();
+                Some(ExpressionType::Identifier(ident))
+            }
+            Token::Int(value) => {
+                Some(ExpressionType::Int(value))
+            }
+            Token::Bang | Token::Minus => {
+                let what = self.parse_prefix();
+                Some(ExpressionType::Prefix(what))
+            }
+            _ => None,
         }
     }
 
@@ -215,11 +223,18 @@ impl<'a> Parser<'a> {
         self.errors.push(message);
     }
 
-    fn parse_prefix() -> Expression {
-        todo!()
+    fn current_clone(&self) -> Token {
+        self.current_token.as_ref().unwrap().clone()
     }
 
-    fn parse_infix(_lhs: Expression) -> Expression {
+    fn parse_prefix(&mut self) -> PrefixExpression {
+        let exp = PrefixExpression::new(self.current_clone());
+        self.next_token();
+        let _right /*exp.right*/ = self.parse_expression(Precedence::Prefix);
+        exp
+    }
+
+    fn parse_infix(&mut self, _lhs: Expression) -> Expression {
         todo!()
     }
 }
