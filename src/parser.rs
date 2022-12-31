@@ -9,13 +9,24 @@ use crate::{
     token::Token,
 };
 
+pub enum Precedence {
+    Lowest,
+    Equals,      // ==
+    LessGreater, // > or <
+    Sum,         // +
+    Product,     // *
+    Prefix,      // -X or !X
+    Call,        // myFunction(X)
+}
+
 struct Parser<'a> {
     lexer: Lexer<'a>,
     current_token: Option<Token>,
     peek_token: Option<Token>,
     errors: Vec<String>,
-    prefix_fns: HashMap<Token, PrefixFn>,
+    //prefix_fns: HashMap<Token, PrefixFn>,
     //infix_fns: HashMap<Token, fn(&mut Parser<'a>) -> Option<Expression>>,
+    precedences: HashMap<Token, Precedence>, 
 }
 
 type PrefixFn = fn(&mut Parser, Token) -> Option<Identifier>;
@@ -33,18 +44,25 @@ impl<'a> Parser<'a> {
     */
 
     fn new(lexer: Lexer<'a>) -> Self {
+        let precedences = HashMap::from([
+            (Token::Equal, Precedence::Equals),
+            (Token::NotEqual, Precedence::Equals),
+            (Token::LessThan, Precedence::LessGreater),
+            (Token::GreaterThan, Precedence::LessGreater),
+            (Token::Plus, Precedence::Sum),
+            (Token::Minus, Precedence::Sum),
+            (Token::Slash, Precedence::Product),
+            (Token::Asterisk, Precedence::Product),
+        ]);
         let mut result = Self {
             lexer,
             current_token: None,
             peek_token: None,
             errors: Vec::new(),
-            prefix_fns: HashMap::new(),
-            //infix_fns: HashMap::new(),
+            precedences,
         };
         result.next_token();
         result.next_token();
-
-        //result.register_prefix(Token::Ident("".to_string()), Parser::parse_identifier);
 
         result
     }
@@ -243,16 +261,6 @@ fn variant_eq(a: &Token, b: &Token) -> bool {
     std::mem::discriminant(a) == std::mem::discriminant(b)
 }
 
-enum Precedence {
-    Lowest,
-    Equals,      // ==
-    LessGreater, // > or <
-    Sum,         // +
-    Product,     // *
-    Prefix,      // -X or !X
-    Call,        // myFunction(X)
-}
-
 #[cfg(test)]
 mod test {
 
@@ -296,7 +304,7 @@ let foobar = 838383;
             if let StatementType::Let(s) = statement {
                 test_let_statement(s, expected);
             } else {
-                panic!();
+                panic!("expected StatementType::Let, got {} instead", statement);
             }
         }
     }
@@ -336,7 +344,7 @@ return 993322;
             if let StatementType::Return(s) = statement {
                 assert_eq!(s.token_literal(), "return");
             } else {
-                panic!();
+                panic!("expected StatementType::Return, got {} instead", statement);
             }
         }
     }
@@ -352,15 +360,14 @@ return 993322;
         assert_eq!(program.statements.len(), 1);
 
         let statement = &program.statements[0];
-        if let StatementType::Expression(_expression_statement) = statement {
-            // ok it is an ExpressionStatement
-
-            //expression_statement.expression
-            // this is supposed to be Identifier idk how
-            // this Identifier is supposed to be foobar
-            // the Identifier.token_literal() should == "foobar"
+        if let StatementType::Expression(expression_statement) = statement {
+            if let ExpressionType::Identifier(ident) = &expression_statement.expression {
+                assert_eq!(ident.token_literal(), "foobar");
+            } else {
+                panic!("expected ExpressionType::Identifier, got {} instead", expression_statement.expression);
+            }
         } else {
-            assert!(false);
+            panic!("expected StatementType::Expression, got {} instead", statement);
         }
     }
 
@@ -376,14 +383,14 @@ return 993322;
 
         let statement = &program.statements[0];
         if let StatementType::Expression(expression_statement) = statement {
-            if let Token::Int(n) = expression_statement.token {
+            if let ExpressionType::Int(n) = expression_statement.expression {
                 assert_eq!(n, 5);
             } else {
-                assert!(false);
+                panic!("expected ExpressionType::Int, got {} instead", expression_statement.expression);
             }
             assert_eq!(expression_statement.token_literal(), "5");
         } else {
-            assert!(false);
+            panic!("expected StatementType::Expression, got {} instead", statement);
         }
     }
 
@@ -399,7 +406,6 @@ return 993322;
             let program = parser.parse_program().unwrap();
             let _error_string = check_parser_errors(&parser);
 
-            println!("{}", program);
             assert_eq!(program.statements.len(), 1);
 
             let statement = &program.statements[0];
@@ -414,6 +420,50 @@ return 993322;
                 }
             } else {
                 panic!("expected StatementType::Expression, got {}", statement);
+            }
+        }
+    }
+
+    #[test]
+    fn test_parsing_infix_expressions() {
+        let inputs = vec!["5 + 5;", "5 - 5;", "5 * 5;",  "5 / 5;", "5 > 5", "5 < 5", "5 == 5;", "5 != 5"];
+        let left_values = vec![5, 5, 5, 5, 5, 5, 5, 5];
+        let operators = vec![ "+", "-", "*", "/", ">", "<", "==", "!="];
+        let right_values = vec![5, 5, 5, 5, 5, 5, 5, 5];
+
+        for i in 0..inputs.len() {
+            let input = inputs[i];
+            let left = left_values[i];
+            let operator = operators[i];
+            let right = right_values[i];
+
+            let lexer = Lexer::new(input);
+            let mut parser = Parser::new(lexer);
+            let program = parser.parse_program().unwrap();
+            let _error_string = check_parser_errors(&parser);
+
+            println!("{}", program);
+            assert_eq!(program.statements.len(), 1);
+
+            let statement = &program.statements[0];
+            if let StatementType::Expression(expression_statement) = &statement {
+                if let ExpressionType::Infix(infix_expression) = &expression_statement.expression {
+                    if let ExpressionType::Int(n) = *infix_expression.left {
+                        assert_eq!(n, left);
+                    } else {
+                        panic!("expected ExpressionType::Int, got {} instead", infix_expression.left);
+                    }
+                    assert_eq!(infix_expression.operator(), operator);
+                    if let ExpressionType::Int(n) = *infix_expression.right {
+                        assert_eq!(n, right);
+                    } else {
+                        panic!("expected ExpressionType::Int, got {} instead", infix_expression.right);
+                    }
+                } else {
+                    panic!("expected ExpressionType::Infix, got {} instead", expression_statement.expression);
+                }
+            } else {
+                panic!("expected StatementType::Expression, got {} instead", statement);
             }
         }
     }

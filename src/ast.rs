@@ -76,6 +76,7 @@ pub enum ExpressionType {
 
     Identifier(Identifier),
     Prefix(PrefixExpression),
+    Infix(InfixExpression),
     Int(usize),
 }
 
@@ -87,6 +88,7 @@ impl std::fmt::Display for ExpressionType {
             ExpressionType::Prefix(_) => "Prefix",
             ExpressionType::Identifier(_) => "Identifier",
             ExpressionType::Int(_) => "Int",
+            ExpressionType::Infix(_) => "Infix",
         };
         write!(f, "ExpressionType::{}", out)
     }
@@ -125,12 +127,12 @@ pub struct PrefixExpression {
 }
 
 impl PrefixExpression {
-    pub fn operator(&self) -> String {
-        self.token.literal()
-    }
-
     pub fn new(token: Token, /*operator: String,*/) -> Self {
         Self { token, /*operator,*/ right: Expression::new() }
+    }
+
+    pub fn operator(&self) -> String {
+        self.token.literal()
     }
 }
 
@@ -140,6 +142,28 @@ impl std::fmt::Display for PrefixExpression {
     }
 }
 
+pub struct InfixExpression {
+    pub token: Token,
+    pub left: Box<ExpressionType>,
+    //pub operator: String,
+    pub right: Box<ExpressionType>,
+}
+
+impl InfixExpression {
+    pub fn new(token: Token) -> Self {
+        Self { token, left: Box::new(ExpressionType::NoExpression), right: Box::new(ExpressionType::NoExpression) }
+    }
+
+    pub fn operator(&self) -> String {
+        self.token.literal()
+    }
+}
+
+impl std::fmt::Display for InfixExpression {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        todo!()
+    }
+}
 
 // -----------------------------------------------------------------------------
 //  Program
