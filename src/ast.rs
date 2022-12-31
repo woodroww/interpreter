@@ -13,6 +13,7 @@ pub trait NodeInterface {
 // -----------------------------------------------------------------------------
 //  Statement 
 // -----------------------------------------------------------------------------
+
 pub struct Statement {
     node: Node,
 }
@@ -33,12 +34,50 @@ impl StatementInterface for Statement {
     }
 }
 
+impl std::fmt::Display for Statement {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.token_literal()) // ?
+    }
+}
+
+// -----------------------------------------------------------------------------
+// Identifier 
+// -----------------------------------------------------------------------------
+
+pub struct Identifier {
+    pub token: Token,
+}
+
+impl std::fmt::Display for Identifier {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.token.literal())
+    }
+}
+
+impl NodeInterface for Identifier {
+    fn token_literal(&self) -> String {
+        self.token.literal()
+    }
+}
+
+impl Identifier {
+    pub fn new(token: Token) -> Self {
+        Identifier { token }
+    }
+}
+
 // -----------------------------------------------------------------------------
 //  Expression
 // -----------------------------------------------------------------------------
 
 pub struct Expression {
     node: Node,
+}
+
+impl std::fmt::Display for Expression {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "Expression")
+    }
 }
 
 pub trait ExpressionInterface {
@@ -66,6 +105,17 @@ impl Expression {
 pub enum StatementType {
     Let(LetStatement),
     Return(ReturnStatement),
+    Expression(ExpressionStatement),
+}
+
+impl std::fmt::Display for StatementType {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            StatementType::Let(s) => write!(f, "{}", s),
+            StatementType::Return(s) => write!(f, "{}", s),
+            StatementType::Expression(s) => write!(f, "{}", s),
+        }
+    }
 }
 
 pub struct Program {
@@ -89,6 +139,20 @@ impl Program {
     }
 }
 
+impl std::fmt::Display for Program {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "[");
+        for (i, s) in self.statements.iter().enumerate() {
+            if i == self.statements.len() - 1 {
+                write!(f, "{}", s);
+            } else {
+                write!(f, "{}, ", s);
+            }
+        }
+        write!(f, "]")
+    }
+}
+
 // -----------------------------------------------------------------------------
 //  LetStatement
 // -----------------------------------------------------------------------------
@@ -103,6 +167,19 @@ pub struct LetStatement {
     pub token: Token,
     pub name: Option<Identifier>,
     pub value: Expression,
+}
+
+impl std::fmt::Display for LetStatement {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.token_literal() + " ")?;
+        let name: String = match &self.name {
+            Some(ident) => format!("{}", ident),
+            None => "unnamed".to_string(),
+        };
+        write!(f, "{}", name)?;
+        write!(f, " = {}", self.value)?;
+        write!(f, ";")
+    }
 }
 
 impl LetStatement {
@@ -132,6 +209,14 @@ pub struct ReturnStatement {
     pub return_value: Expression,
 }
 
+impl std::fmt::Display for ReturnStatement {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{} ", self.token_literal())?;
+        write!(f, "{}", self.return_value)?;
+        write!(f, ";")
+    }
+}
+
 impl StatementInterface for ReturnStatement {
     fn statement_node() {
         todo!()
@@ -151,22 +236,45 @@ impl ReturnStatement {
 }
 
 // -----------------------------------------------------------------------------
-// Identifier 
+//  ExpressionStatement
 // -----------------------------------------------------------------------------
+// basically a wrapper for an expression, like when you type `1 + 1` in the
+// python REPL and you get 2, no let, no return
 
-pub struct Identifier {
-    pub token: Token,
-    pub value: String,
+pub struct ExpressionStatement {
+    token: Token,
+    expression: Expression,
 }
 
-impl NodeInterface for Identifier {
+impl std::fmt::Display for ExpressionStatement {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.expression)
+    }
+}
+
+impl StatementInterface for ExpressionStatement {
+    fn statement_node() {
+        todo!()
+    }
+}
+
+impl NodeInterface for ExpressionStatement {
     fn token_literal(&self) -> String {
         self.token.literal()
     }
 }
 
-impl Identifier {
-    pub fn new(token: Token, value: String) -> Self {
-        Identifier { token, value }
+#[cfg(test)]
+mod test {
+    use super::*;
+    //use pretty_assertions::assert_eq;
+
+    #[test]
+    fn test_display() {
+        let program = Program::new();
+        let mut let_statement = LetStatement::new(Token::Let);
+        let_statement.name = Some(Identifier::new(Token::Ident("myVar".to_string())));
+        //let_statement.value = 
+        assert!(false);
     }
 }

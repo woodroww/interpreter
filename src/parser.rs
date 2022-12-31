@@ -1,7 +1,5 @@
-use std::{rc::Rc, cell::RefCell, any::Any};
 use crate::{
-    ast::{Identifier, LetStatement, NodeInterface},
-    ast::{Program, Statement, StatementInterface, ReturnStatement, StatementType},
+    ast::{Identifier, NodeInterface, LetStatement, Program, ReturnStatement, StatementType, Expression},
     lexer::Lexer,
     token::Token,
 };
@@ -11,9 +9,24 @@ struct Parser<'a> {
     current_token: Option<Token>,
     peek_token: Option<Token>,
     errors: Vec<String>,
+    //prefix_fns: HashMap<Token, dyn Fn>,
 }
 
 impl<'a> Parser<'a> {
+
+    //fn register_prefix(token: Token, fn);
+    //fn register_infix(token: Token, fn);
+/*
+identifiers as arguments in a function call
+add(foobar, barfoo);
+identifiers as operands in an infix expression
+foobar + barfoo;
+identifier as a standalone expression as part of a conditional
+if (foobar) {
+
+just like any other expression, identifiers produce a value, the value they are bound to
+*/
+
     fn new(lexer: Lexer<'a>) -> Self {
         let mut result = Self {
             lexer,
@@ -37,7 +50,7 @@ impl<'a> Parser<'a> {
 
     fn parse_program(&mut self) -> Option<Program> {
         let mut program: Program = Program::new();
-        while let Some(token) = &self.current_token {
+        while let Some(_token) = &self.current_token {
             let statement = self.parse_statement();
             if let Some(statement) = statement {
                 program.statements.push(statement);
@@ -98,10 +111,10 @@ impl<'a> Parser<'a> {
         }
 
         if let Some(current) = self.current_token.clone() {
-            if let Token::Ident(ref ident) = current {
+            if let Token::Ident(ref _ident) = current {
                 statement.name = Some(Identifier::new(
                     self.current_token.clone().unwrap(),
-                    ident.to_string(),
+                    //ident.to_string(),
                 ));
                 if !self.expect_peek(&Token::Assign) {
                     return None;
@@ -150,6 +163,14 @@ impl<'a> Parser<'a> {
         );
         self.errors.push(message);
     }
+
+    fn parse_prefix() -> Expression {
+        todo!()
+    }
+
+    fn parse_infix(_lhs: Expression) -> Expression {
+        todo!()
+    }
 }
 
 fn variant_eq(a: &Token, b: &Token) -> bool {
@@ -164,7 +185,7 @@ mod test {
 
     fn test_let_statement(s: &LetStatement, name: &str) {
         assert_eq!(s.token_literal(), "let");
-        assert_eq!(s.name.as_ref().unwrap().value, name);
+        //assert_eq!(s.name.as_ref().unwrap().value, name);
         assert_eq!(s.name.as_ref().unwrap().token_literal(), name)
     }
 
@@ -242,5 +263,32 @@ return 993322;
                 panic!();
             }
         }
+    }
+
+    #[test]
+    fn test_identifier_expression() {
+        let input = "foobar;";
+        let lexer = Lexer::new(input);
+        let mut parser = Parser::new(lexer);
+        let program = parser.parse_program().unwrap();
+        let _error_string = check_parser_errors(&parser);
+
+        assert_eq!(program.statements.len(), 1);
+
+        let statement = &program.statements[0];
+        if let StatementType::Expression(_expression_statement) = statement {
+            // ok it is an ExpressionStatement
+
+            //expression_statement.expression
+            // this is supposed to be Identifier idk how
+            // this Identifier is supposed to be foobar
+            // the Identifier.token_literal() should == "foobar"
+
+        } else {
+            assert!(false);
+        }
+
+
+
     }
 }
