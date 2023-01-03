@@ -9,6 +9,8 @@ fn main() -> io::Result<()> {
     loop {
         io::stdin().read_line(&mut buffer)?;
         let tokens = Lexer::new(&buffer).collect::<Vec<Token>>();
-        println!("{:?}", tokens);
+        for t in &tokens {
+            println!("{}", t);
+        }
     }
 }

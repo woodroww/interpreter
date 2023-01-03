@@ -1,4 +1,4 @@
-use crate::token::Token;
+use crate::token::{TokenType, Token};
 
 // -----------------------------------------------------------------------------
 //  Node
@@ -11,7 +11,7 @@ pub trait NodeInterface {
 }
 
 // -----------------------------------------------------------------------------
-//  Statement 
+//  Statement
 // -----------------------------------------------------------------------------
 
 pub struct Statement {
@@ -41,28 +41,30 @@ impl StatementInterface for Statement {
 }
 
 // -----------------------------------------------------------------------------
-// Identifier 
+// Identifier
 // -----------------------------------------------------------------------------
 
 pub struct Identifier {
     pub token: Token,
+    pub value: String,
 }
 
 impl std::fmt::Display for Identifier {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.token.literal())
+        write!(f, "Identifier: token: {}, value: {}", self.token, self.value)
     }
 }
 
 impl NodeInterface for Identifier {
     fn token_literal(&self) -> String {
-        self.token.literal()
+        //self.token.literal()
+        "idk what/*.!&!".to_string()
     }
 }
 
 impl Identifier {
-    pub fn new(token: Token) -> Self {
-        Identifier { token }
+    pub fn new(token: Token, value: &str) -> Self {
+        Identifier { token, value: value.to_string() }
     }
 }
 
@@ -122,40 +124,47 @@ impl Expression {
 
 pub struct PrefixExpression {
     pub token: Token, // Bang or Minus at this point
-    //operator: String,
-    pub right: Expression,
+    pub operator: String,
+    pub right: Box<ExpressionType>,
 }
 
 impl PrefixExpression {
-    pub fn new(token: Token, /*operator: String,*/) -> Self {
-        Self { token, /*operator,*/ right: Expression::new() }
-    }
-
-    pub fn operator(&self) -> String {
-        self.token.literal()
+    pub fn new(token: Token, operator: &str) -> Self {
+        Self {
+            token,
+            operator: operator.to_string(),
+            right: Box::new(ExpressionType::NoExpression),
+        }
     }
 }
 
 impl std::fmt::Display for PrefixExpression {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "({}{})", /*self.operator*/ self.token.literal(), self.right)
+        write!(
+            f,
+            "PrefixExpression: token: {}, operator: {}, right: {}",
+            self.token,
+            self.operator,
+            format!("{}", self.right),
+        )
     }
 }
 
 pub struct InfixExpression {
     pub token: Token,
     pub left: Box<ExpressionType>,
-    //pub operator: String,
+    pub operator: String,
     pub right: Box<ExpressionType>,
 }
 
 impl InfixExpression {
-    pub fn new(token: Token) -> Self {
-        Self { token, left: Box::new(ExpressionType::NoExpression), right: Box::new(ExpressionType::NoExpression) }
-    }
-
-    pub fn operator(&self) -> String {
-        self.token.literal()
+    pub fn new(token: Token, operator: &str, left: ExpressionType) -> Self {
+        Self {
+            token,
+            left: Box::new(left),
+            operator: operator.to_string(),
+            right: Box::new(ExpressionType::NoExpression),
+        }
     }
 }
 
@@ -216,10 +225,11 @@ impl NodeInterface for Program {
 
 impl Program {
     pub fn new() -> Self {
-        Self { statements: Vec::new() }
+        Self {
+            statements: Vec::new(),
+        }
     }
 }
-
 
 // -----------------------------------------------------------------------------
 //  LetStatement
@@ -234,7 +244,7 @@ type LetStatement struct {
 pub struct LetStatement {
     pub token: Token,
     pub name: Option<Identifier>,
-    pub value: Expression,
+    pub value: ExpressionType,
 }
 
 impl std::fmt::Display for LetStatement {
@@ -252,7 +262,11 @@ impl std::fmt::Display for LetStatement {
 
 impl LetStatement {
     pub fn new(token: Token) -> Self {
-        Self { token, name: None, value: Expression { node: Node }  }
+        Self {
+            token,
+            name: None,
+            value: ExpressionType::NoExpression,
+        }
     }
 }
 
@@ -264,7 +278,8 @@ impl StatementInterface for LetStatement {
 
 impl NodeInterface for LetStatement {
     fn token_literal(&self) -> String {
-        self.token.literal()
+        "idk what literal".to_string()
+        //self.token.literal()
     }
 }
 
@@ -293,13 +308,17 @@ impl StatementInterface for ReturnStatement {
 
 impl NodeInterface for ReturnStatement {
     fn token_literal(&self) -> String {
-        self.token.literal()
+        "idk what literal".to_string()
+        //self.token.literal()
     }
 }
 
 impl ReturnStatement {
     pub fn new(token: Token) -> Self {
-        Self { token, return_value: Expression { node: Node }  }
+        Self {
+            token,
+            return_value: Expression { node: Node },
+        }
     }
 }
 
@@ -316,7 +335,7 @@ pub struct ExpressionStatement {
 
 impl std::fmt::Display for ExpressionStatement {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{} token: {}", self.expression, self.token.token_type())
+        write!(f, "{} token: {}", self.expression, self.token)
     }
 }
 
@@ -328,13 +347,17 @@ impl StatementInterface for ExpressionStatement {
 
 impl NodeInterface for ExpressionStatement {
     fn token_literal(&self) -> String {
-        self.token.literal()
+        "I really don't know".to_string()
+        //self.token.literal()
     }
 }
 
 impl ExpressionStatement {
     pub fn new(token: Token) -> Self {
-        Self { token, expression: ExpressionType::NoExpression }
+        Self {
+            token,
+            expression: ExpressionType::NoExpression,
+        }
     }
 }
 
@@ -347,9 +370,9 @@ mod test {
     #[ignore]
     fn test_display() {
         let program = Program::new();
-        let mut let_statement = LetStatement::new(Token::Let);
-        let_statement.name = Some(Identifier::new(Token::Ident("myVar".to_string())));
-        //let_statement.value = 
+        let mut let_statement = LetStatement::new(Token::new(TokenType::Let, "let"));
+        let_statement.name = Some(Identifier::new(Token::new(TokenType::Ident, "myVar"), "myVar"));
+        //let_statement.value =
         assert!(false);
     }
 }
