@@ -64,11 +64,11 @@ impl std::fmt::Display for TokenType {
 }
 
 impl TokenType {
-    /*pub fn literal(&self) -> String {
+    pub fn literal(&self) -> String {
         match self {
             TokenType::Illegal => "illegal".to_string(),
-            TokenType::Ident => ident.to_string(),
-            TokenType::Int(n) => n.to_string(),
+            TokenType::Ident => "".to_string(),
+            TokenType::Int => "".to_string(),
             TokenType::Assign => "=".to_string(),
             TokenType::Plus => "+".to_string(),
             TokenType::Minus => "-".to_string(),
@@ -93,7 +93,7 @@ impl TokenType {
             TokenType::Else => "else".to_string(),
             TokenType::Return => "return".to_string(),
         }
-    }*/
+    }
 
     pub const fn token_string(&self) -> &'static str {
         match self {

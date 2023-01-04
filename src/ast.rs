@@ -46,25 +46,24 @@ impl StatementInterface for Statement {
 
 pub struct Identifier {
     pub token: Token,
-    pub value: String,
+    //pub value: String,
 }
 
 impl std::fmt::Display for Identifier {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "Identifier: token: {}, value: {}", self.token, self.value)
+        write!(f, "{}", self.token.literal)
     }
 }
 
 impl NodeInterface for Identifier {
     fn token_literal(&self) -> String {
-        //self.token.literal()
-        "idk what/*.!&!".to_string()
+        self.token.literal.clone()
     }
 }
 
 impl Identifier {
-    pub fn new(token: Token, value: &str) -> Self {
-        Identifier { token, value: value.to_string() }
+    pub fn new(token: Token) -> Self {
+        Identifier { token }
     }
 }
 
@@ -74,28 +73,31 @@ impl Identifier {
 
 pub enum ExpressionType {
     NoExpression,
-    Expression(Expression),
+    //Expression(Expression),
 
     Identifier(Identifier),
     Prefix(PrefixExpression),
     Infix(InfixExpression),
     Int(usize),
+    Return,
+    Assign,
 }
 
 impl std::fmt::Display for ExpressionType {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let out = match self {
-            ExpressionType::NoExpression => "NoExpression",
-            ExpressionType::Expression(_) => "Expression",
-            ExpressionType::Prefix(_) => "Prefix",
-            ExpressionType::Identifier(_) => "Identifier",
-            ExpressionType::Int(_) => "Int",
-            ExpressionType::Infix(_) => "Infix",
-        };
-        write!(f, "ExpressionType::{}", out)
+        match self {
+            ExpressionType::NoExpression => write!(f, "NoExpression"),
+            ExpressionType::Prefix(prefix) => write!(f, "{}", prefix),
+            ExpressionType::Identifier(ident) => write!(f, "{}", ident),
+            ExpressionType::Int(integer) => write!(f, "{}", integer),
+            ExpressionType::Infix(infix) => write!(f, "{}", infix), 
+            ExpressionType::Return => write!(f, "return"),
+            ExpressionType::Assign => write!(f, "="),
+        }
     }
 }
 
+/*
 pub struct Expression {
     node: Node,
 }
@@ -120,7 +122,7 @@ impl Expression {
     pub fn new() -> Self {
         Self { node: Node }
     }
-}
+}*/
 
 pub struct PrefixExpression {
     pub token: Token, // Bang or Minus at this point
@@ -170,7 +172,7 @@ impl InfixExpression {
 
 impl std::fmt::Display for InfixExpression {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        todo!()
+        write!(f, "")
     }
 }
 
@@ -278,8 +280,7 @@ impl StatementInterface for LetStatement {
 
 impl NodeInterface for LetStatement {
     fn token_literal(&self) -> String {
-        "idk what literal".to_string()
-        //self.token.literal()
+        self.token.literal.clone()
     }
 }
 
@@ -289,7 +290,7 @@ impl NodeInterface for LetStatement {
 
 pub struct ReturnStatement {
     pub token: Token,
-    pub return_value: Expression,
+    pub return_value: ExpressionType,
 }
 
 impl std::fmt::Display for ReturnStatement {
@@ -308,8 +309,7 @@ impl StatementInterface for ReturnStatement {
 
 impl NodeInterface for ReturnStatement {
     fn token_literal(&self) -> String {
-        "idk what literal".to_string()
-        //self.token.literal()
+        self.token.literal.clone()
     }
 }
 
@@ -317,7 +317,7 @@ impl ReturnStatement {
     pub fn new(token: Token) -> Self {
         Self {
             token,
-            return_value: Expression { node: Node },
+            return_value: ExpressionType::Return,
         }
     }
 }
@@ -347,8 +347,7 @@ impl StatementInterface for ExpressionStatement {
 
 impl NodeInterface for ExpressionStatement {
     fn token_literal(&self) -> String {
-        "I really don't know".to_string()
-        //self.token.literal()
+        self.token.literal.clone()
     }
 }
 
@@ -364,15 +363,15 @@ impl ExpressionStatement {
 #[cfg(test)]
 mod test {
     use super::*;
-    //use pretty_assertions::assert_eq;
+    use pretty_assertions::assert_eq;
 
     #[test]
-    #[ignore]
-    fn test_display() {
+    fn test_display() { // TestString in book
         let program = Program::new();
         let mut let_statement = LetStatement::new(Token::new(TokenType::Let, "let"));
-        let_statement.name = Some(Identifier::new(Token::new(TokenType::Ident, "myVar"), "myVar"));
-        //let_statement.value =
-        assert!(false);
+        let_statement.name = Some(Identifier::new(Token::new(TokenType::Ident, "myVar")));
+        let_statement.value = ExpressionType::Identifier(Identifier::new(Token::new(TokenType::Ident, "anotherVar")));
+        
+        assert_eq!(&format!("{}", let_statement), "let myVar = anotherVar;");
     }
 }

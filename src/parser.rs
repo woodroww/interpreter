@@ -83,7 +83,7 @@ type ParseInfixFn = fn(&mut Parser, ExpressionType) -> Option<ExpressionType>;
 
 fn parse_identifier(parser: &mut Parser) -> Option<ExpressionType> {
     Some(ExpressionType::Identifier(Identifier::new(
-        parser.current_clone(), "damn where does this come from"
+        parser.current_clone()
     )))
 }
 
@@ -182,7 +182,7 @@ impl<'a> Parser<'a> {
         if self.current_token.is_none() {
             return None;
         }
-        let token = self.current_token.as_ref().unwrap();
+        let token = self.current_clone();
         match token.token_type {
             TokenType::Let => {
                 if let Some(statement) = self.parse_let_statement() {
@@ -203,13 +203,33 @@ impl<'a> Parser<'a> {
         None
     }
 
+    fn parse_expression_statement(&mut self) -> Option<ExpressionStatement> {
+        if self.current_token.is_none() {
+            return None;
+        }
+        println!(
+            "parse_expression_statement with token: {}",
+            self.current_clone()
+        );
+        let mut statement = ExpressionStatement::new(self.current_clone());
+        statement.expression = match self.parse_expression(Precedence::Lowest) {
+            Some(e) => e,
+            None => ExpressionType::NoExpression,
+        };
+
+        if self.peek_token_is(&TokenType::Semicolon) {
+            self.next_token();
+        }
+
+        Some(statement)
+    }
+
     // page 70
     fn parse_expression(&mut self, precedence: Precedence) -> Option<ExpressionType> {
         let token = self.current_clone();
         let mut left_exp = match self.prefix_fns.get(&token.token_type) {
             Some(prefix_fn) => prefix_fn(self),
             None => {
-                println!("no_prefix_parse_fn_error {}", token);
                 self.no_prefix_parse_fn_error(token);
                 return None;
             }
@@ -231,7 +251,7 @@ impl<'a> Parser<'a> {
     }
 
     fn no_prefix_parse_fn_error(&mut self, token: Token) {
-        let msg = format!("no prefix parse function for {} found", token);
+        let msg = format!("no prefix parse function found for {}", token);
         self.errors.push(msg);
     }
 
@@ -241,7 +261,8 @@ impl<'a> Parser<'a> {
                 &self
                     .peek_token
                     .as_ref()
-                    .expect("I'll have to deal with this sometime").token_type,
+                    .expect("I'll have to deal with this sometime")
+                    .token_type,
             )
             .expect("there should be an entry for this")
     }
@@ -253,7 +274,8 @@ impl<'a> Parser<'a> {
                 &self
                     .current_token
                     .as_ref()
-                    .expect("I'll have to deal with this sometime").token_type,
+                    .expect("I'll have to deal with this sometime")
+                    .token_type,
             )
             .expect("there should be an entry for this")
     }
@@ -275,72 +297,14 @@ impl<'a> Parser<'a> {
         self.peek_token = self.lexer.next();
     }
 
-    /*
-        fn old_parse_expression(&mut self, precedence: Precedence) -> Option<ExpressionType> {
-            // call parse_prefix for self.current_token
-            // return result of that
-            let token = self.current_clone();
-            let left_exp = match token {
-                Token::Ident(_data) => {
-                    let ident = self.parse_identifier().unwrap();
-                    Some(ExpressionType::Identifier(ident))
-                }
-                Token::Int(value) => Some(ExpressionType::Int(value)),
-                Token::Bang | Token::Minus => {
-                    Some(ExpressionType::Prefix(self.parse_prefix()))
-                }
-                /* where does this belong?
-                Token::Plus
-                | Token::Minus
-                | Token::Slash
-                | Token::Asterisk
-                | Token::Equal
-                | Token::NotEqual
-                | Token::LessThan
-                | Token::GreaterThan => {
-                    Some(ExpressionType::Prefix(self.parse_prefix()))
-                }*/
-                _ => None,
-            };
-            if left_exp.is_none() {
-                return None;
-            }
-            let mut left_exp = left_exp.expect("we checked above");
-
-            while !self.peek_token_is(&Token::Semicolon)
-                && (precedence as usize) < (*self.peek_precedence() as usize)
-            {
-                self.next_token();
-                left_exp = ExpressionType::Infix(self.parse_infix(left_exp));
-            }
-            None
-        }
-    */
-    fn parse_expression_statement(&mut self) -> Option<ExpressionStatement> {
-        if self.current_token.is_none() {
-            return None;
-        }
-        let mut statement = ExpressionStatement::new(self.current_token.as_ref().unwrap().clone());
-        statement.expression = match self.parse_expression(Precedence::Lowest) {
-            Some(e) => e,
-            None => {
-                println!("parse_expression_statement: parse_expression returned None");
-                ExpressionType::NoExpression
-            }
-        };
-
-        if self.peek_token_is(&TokenType::Semicolon) {
-            self.next_token();
-        }
-
-        Some(statement)
-    }
-
     fn parse_return_statement(&mut self) -> Option<ReturnStatement> {
         if self.current_token.is_none() {
             return None;
         }
-        let mut statement = ReturnStatement::new(self.current_token.as_ref().unwrap().clone());
+        let mut token = self.current_clone();
+        token.literal = "return".to_string();
+        //println!("so we have a parse_return_statement\nwith a token {}", token);
+        let statement = ReturnStatement::new(token);
         self.next_token();
         while !self.current_token_is(&TokenType::Semicolon) {
             self.next_token();
@@ -352,26 +316,26 @@ impl<'a> Parser<'a> {
         if self.current_token.is_none() {
             return None;
         }
-        let mut statement = LetStatement::new(self.current_token.as_ref().unwrap().clone());
+        let mut token = self.current_clone();
+        let mut statement = LetStatement::new(token.clone());
 
         if !self.expect_peek(&TokenType::Ident) {
+            println!("ERROR: found let keyword but next token is not Ident");
             return None;
         }
 
         let token = self.current_clone();
-        //if let Some(current) = token {
-            if TokenType::Ident == token.token_type {
-                let literal = token.literal.clone();
-                statement.name = Some(Identifier::new(token, &literal));
-                if !self.expect_peek(&TokenType::Assign) {
-                    return None;
-                }
-                while !self.current_token_is(&TokenType::Semicolon) {
-                    self.next_token();
-                }
-                return Some(statement);
+        if TokenType::Ident == token.token_type {
+            //println!("ident literal is {}", literal);
+            statement.name = Some(Identifier::new(token));
+            if !self.expect_peek(&TokenType::Assign) {
+                return None;
             }
-        //}
+            while !self.current_token_is(&TokenType::Semicolon) {
+                self.next_token();
+            }
+            return Some(statement);
+        }
         None
     }
 
@@ -398,9 +362,7 @@ impl<'a> Parser<'a> {
         let peek = self.peek_token.as_ref().unwrap();
         let message = format!(
             "expected next token to be '{}', got '{}, {}' instead",
-            expected,
-            peek.token_type,
-            peek
+            expected, peek.token_type, peek
         );
         self.errors.push(message);
     }
@@ -467,6 +429,11 @@ let foobar = 838383;
         let lexer = Lexer::new(input);
         let mut parser = Parser::new(lexer);
         let program = parser.parse_program().unwrap();
+        let error_string = check_parser_errors(&parser);
+        if let Some(err) = error_string {
+            println!("{}", err);
+        }
+        println!("{}", program);
         assert_eq!(program.statements.len(), 3);
         let expected = vec!["x", "y", "foobar"];
 
@@ -600,8 +567,7 @@ return 993322;
                     } else {
                         panic!(
                             "expected operator {}, got {}",
-                            operator,
-                            prefix_expression.operator
+                            operator, prefix_expression.operator
                         );
                     }
                 } else {
@@ -619,7 +585,7 @@ return 993322;
     #[test]
     fn test_parsing_infix_expressions() {
         let inputs = vec![
-            "5 + 5;", "5 - 5;", "5 * 5;", "5 / 5;", "5 > 5", "5 < 5", "5 == 5;", "5 != 5",
+            "5 + 5;", "5 - 5;", "5 * 5;", "5 / 5;", "5 > 5;", "5 < 5;", "5 == 5;", "5 != 5;",
         ];
         let left_values = vec![5, 5, 5, 5, 5, 5, 5, 5];
         let operators = vec!["+", "-", "*", "/", ">", "<", "==", "!="];
@@ -674,3 +640,45 @@ return 993322;
         }
     }
 }
+
+/*
+    fn old_parse_expression(&mut self, precedence: Precedence) -> Option<ExpressionType> {
+        // call parse_prefix for self.current_token
+        // return result of that
+        let token = self.current_clone();
+        let left_exp = match token {
+            Token::Ident(_data) => {
+                let ident = self.parse_identifier().unwrap();
+                Some(ExpressionType::Identifier(ident))
+            }
+            Token::Int(value) => Some(ExpressionType::Int(value)),
+            Token::Bang | Token::Minus => {
+                Some(ExpressionType::Prefix(self.parse_prefix()))
+            }
+            /* where does this belong?
+            Token::Plus
+            | Token::Minus
+            | Token::Slash
+            | Token::Asterisk
+            | Token::Equal
+            | Token::NotEqual
+            | Token::LessThan
+            | Token::GreaterThan => {
+                Some(ExpressionType::Prefix(self.parse_prefix()))
+            }*/
+            _ => None,
+        };
+        if left_exp.is_none() {
+            return None;
+        }
+        let mut left_exp = left_exp.expect("we checked above");
+
+        while !self.peek_token_is(&Token::Semicolon)
+            && (precedence as usize) < (*self.peek_precedence() as usize)
+        {
+            self.next_token();
+            left_exp = ExpressionType::Infix(self.parse_infix(left_exp));
+        }
+        None
+    }
+*/

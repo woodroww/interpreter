@@ -15,60 +15,106 @@ impl<'a> Iterator for Lexer<'a> {
             return None;
         }
         let c = c.unwrap();
-        let mut token = Token::new(TokenType::Illegal, "");
+        let token_literal; //= String::new();
+        let token_type;
+
         match c {
-            '+' => token.token_type = TokenType::Plus,
-            '-' => token.token_type = TokenType::Minus,
-            '/' => token.token_type = TokenType::Slash,
-            '*' => token.token_type = TokenType::Asterisk,
-            ',' => token.token_type = TokenType::Comma,
-            ';' => token.token_type = TokenType::Semicolon,
-            '(' => token.token_type = TokenType::Lparen,
-            ')' => token.token_type = TokenType::Rparen,
-            '{' => token.token_type = TokenType::Lbrace,
-            '}' => token.token_type = TokenType::Rbrace,
-            '<' => token.token_type = TokenType::LessThan,
-            '>' => token.token_type = TokenType::GreaterThan,
+            '+' => {
+                token_type = TokenType::Plus;
+                token_literal = c.to_string();
+            }
+            '-' => {
+                token_type = TokenType::Minus;
+                token_literal = c.to_string();
+            }
+            '/' => {
+                token_type = TokenType::Slash;
+                token_literal = c.to_string();
+            }
+            '*' => {
+                token_type = TokenType::Asterisk;
+                token_literal = c.to_string();
+            }
+            ',' => {
+                token_type = TokenType::Comma;
+                token_literal = c.to_string();
+            }
+            ';' => {
+                token_type = TokenType::Semicolon;
+                token_literal = c.to_string();
+            }
+            '(' => {
+                token_type = TokenType::Lparen;
+                token_literal = c.to_string();
+            }
+            ')' => {
+                token_type = TokenType::Rparen;
+                token_literal = c.to_string();
+            }
+            '{' => {
+                token_type = TokenType::Lbrace;
+                token_literal = c.to_string();
+            }
+            '}' => {
+                token_type = TokenType::Rbrace;
+                token_literal = c.to_string();
+            }
+            '<' => {
+                token_type = TokenType::LessThan;
+                token_literal = c.to_string();
+            }
+            '>' => {
+                token_type = TokenType::GreaterThan;
+                token_literal = c.to_string();
+            }
             '=' => {
                 if let Some(next) = self.chars.peek() {
                     if *next == '=' {
                         self.chars.next();
-                        token.token_type = TokenType::Equal;
+                        token_type = TokenType::Equal;
                     } else {
-                        token.token_type = TokenType::Assign;
+                        token_type = TokenType::Assign;
                     }
                 } else {
-                    token.token_type = TokenType::Assign;
+                    token_type = TokenType::Assign;
                 }
+                token_literal = token_type.literal();
             }
             '!' => {
                 if let Some(next) = self.chars.peek() {
                     if *next == '=' {
                         self.chars.next();
-                        token.token_type = TokenType::NotEqual;
+                        token_type = TokenType::NotEqual;
                     } else {
-                        token.token_type = TokenType::Bang;
+                        token_type = TokenType::Bang;
                     }
                 } else {
-                    token.token_type = TokenType::Bang;
+                    token_type = TokenType::Bang;
                 }
+                token_literal = token_type.literal();
             }
             c if c.is_numeric() => {
-                token.token_type = TokenType::Int;
-                token.literal = self.read_number(c).to_string();
+                token_type = TokenType::Int;
+                token_literal = self.read_number(c).to_string();
             }
             c if !c.is_whitespace() => {
-                let ident = self.read_identifier(c);
-                let entry: Option<&TokenType> = KEYWORDS.get(&ident);
+                token_literal = self.read_identifier(c);
+                let entry: Option<&TokenType> = KEYWORDS.get(&token_literal);
                 if let Some(keyword_token) = entry {
-                    token.token_type = keyword_token.clone();
+                    //println!("keyword_token: {}, literal: {}", keyword_token, keyword_token.literal());
+                    token_type = keyword_token.clone();
                 } else {
-                    token.token_type = TokenType::Ident;
+                    //println!("ident literal: {}", ident);
+                    token_type = TokenType::Ident;
                 }
             }
-            _ => token.token_type = TokenType::Illegal,
+            _ => {
+                token_type = TokenType::Illegal;
+                //println!("unknown char: {}", c);
+                token_literal = c.to_string();
+            }
         };
-        Some(token)
+        Some(Token::new(token_type, &token_literal))
     }
 }
 
