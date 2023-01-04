@@ -167,6 +167,7 @@ impl<'a> Parser<'a> {
     }
 
     fn parse_program(&mut self) -> Option<Program> {
+        //println!("parse_program");
         let mut program: Program = Program::new();
         while let Some(_token) = &self.current_token {
             let statement = self.parse_statement();
@@ -179,6 +180,7 @@ impl<'a> Parser<'a> {
     }
 
     fn parse_statement(&mut self) -> Option<StatementType> {
+        //println!("parse_statement");
         if self.current_token.is_none() {
             return None;
         }
@@ -204,13 +206,10 @@ impl<'a> Parser<'a> {
     }
 
     fn parse_expression_statement(&mut self) -> Option<ExpressionStatement> {
+        //println!("parse_expression_statement");
         if self.current_token.is_none() {
             return None;
         }
-        println!(
-            "parse_expression_statement with token: {}",
-            self.current_clone()
-        );
         let mut statement = ExpressionStatement::new(self.current_clone());
         statement.expression = match self.parse_expression(Precedence::Lowest) {
             Some(e) => e,
@@ -226,6 +225,7 @@ impl<'a> Parser<'a> {
 
     // page 70
     fn parse_expression(&mut self, precedence: Precedence) -> Option<ExpressionType> {
+        //println!("parse_expression");
         let token = self.current_clone();
         let mut left_exp = match self.prefix_fns.get(&token.token_type) {
             Some(prefix_fn) => prefix_fn(self),
@@ -235,7 +235,7 @@ impl<'a> Parser<'a> {
             }
         };
         while !self.peek_token_is(&TokenType::Semicolon)
-            && (precedence as usize) < (*self.peek_precedence() as usize)
+            && (precedence as usize) < (self.peek_precedence() as usize)
         {
             let peek = self.peek_token.clone().unwrap();
             let infix = self.infix_fns.get(&peek.token_type);
@@ -255,16 +255,21 @@ impl<'a> Parser<'a> {
         self.errors.push(msg);
     }
 
-    fn peek_precedence(&self) -> &Precedence {
+    fn peek_precedence(&self) -> Precedence {
+        let peek = match &self.peek_token {
+            Some(token) => token.literal.clone(),
+            None => return Precedence::Lowest,
+        };
+        //println!("peek_precedence: current: {}, peek: {}", self.current_clone(), peek);
         self.precedences
             .get(
                 &self
                     .peek_token
                     .as_ref()
-                    .expect("I'll have to deal with this sometime")
+                    .expect("we checked above")
                     .token_type,
             )
-            .expect("there should be an entry for this")
+            .expect("there has to be an entry for this").clone()
     }
 
     fn current_precedence(&self) -> Precedence {
@@ -340,10 +345,16 @@ impl<'a> Parser<'a> {
     }
 
     fn peek_token_is(&self, token: &TokenType) -> bool {
+        if self.peek_token.is_none() {
+            return false;
+        }
         token == &self.peek_token.as_ref().unwrap().token_type
     }
 
     fn current_token_is(&self, token: &TokenType) -> bool {
+        if self.current_token.is_none() {
+            return false;
+        }
         token == &self.current_token.as_ref().unwrap().token_type
     }
 
@@ -399,7 +410,7 @@ mod test {
 
     use super::*;
     use crate::ast::NodeInterface;
-    use pretty_assertions::assert_eq;
+    //use pretty_assertions::assert_eq;
 
     fn test_let_statement(s: &LetStatement, name: &str) {
         assert_eq!(s.token_literal(), "let");
@@ -639,46 +650,47 @@ return 993322;
             }
         }
     }
+
+    #[test]
+    fn test_operator_precedence_parsing() {
+        let inputs = vec![
+            "-a * b",
+            "!-a",
+            "a + b + c",
+            "a + b - c",
+            "a * b * c",
+            "a * b / c",
+            "a + b / c",
+            "a + b * c + d / e - f",
+            "3 + 4; -5 * 5",
+            "5 > 4 == 3 < 4",
+            "5 < 4 != 3 > 4",
+            "3 + 4 * 5 == 3 * 1 + 4 * 5",
+        ];
+
+        let expecteds = vec![
+            "((-a) * b)",
+            "(!(-a))",
+            "((a + b) + c)",
+            "((a + b) - c)",
+            "((a * b) * c)",
+            "((a * b) / c)",
+            "(a + (b / c))",
+            "(((a + (b * c)) + (d / e)) - f)",
+            "(3 + 4)((-5) * 5)",
+            "((5 > 4) == (3 < 4))",
+            "((5 < 4) != (3 > 4))",
+            "((3 + (4 * 5)) == ((3 * 1) + (4 * 5)))",
+        ];
+
+
+        for (input, expected) in inputs.into_iter().zip(expecteds) {
+            let lexer = Lexer::new(input);
+            let mut parser = Parser::new(lexer);
+            let program = parser.parse_program().unwrap();
+            let _error_string = check_parser_errors(&parser);
+            assert_eq!(expected, format!("{}", program));
+        }
+    }
 }
 
-/*
-    fn old_parse_expression(&mut self, precedence: Precedence) -> Option<ExpressionType> {
-        // call parse_prefix for self.current_token
-        // return result of that
-        let token = self.current_clone();
-        let left_exp = match token {
-            Token::Ident(_data) => {
-                let ident = self.parse_identifier().unwrap();
-                Some(ExpressionType::Identifier(ident))
-            }
-            Token::Int(value) => Some(ExpressionType::Int(value)),
-            Token::Bang | Token::Minus => {
-                Some(ExpressionType::Prefix(self.parse_prefix()))
-            }
-            /* where does this belong?
-            Token::Plus
-            | Token::Minus
-            | Token::Slash
-            | Token::Asterisk
-            | Token::Equal
-            | Token::NotEqual
-            | Token::LessThan
-            | Token::GreaterThan => {
-                Some(ExpressionType::Prefix(self.parse_prefix()))
-            }*/
-            _ => None,
-        };
-        if left_exp.is_none() {
-            return None;
-        }
-        let mut left_exp = left_exp.expect("we checked above");
-
-        while !self.peek_token_is(&Token::Semicolon)
-            && (precedence as usize) < (*self.peek_precedence() as usize)
-        {
-            self.next_token();
-            left_exp = ExpressionType::Infix(self.parse_infix(left_exp));
-        }
-        None
-    }
-*/

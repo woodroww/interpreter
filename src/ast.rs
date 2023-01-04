@@ -20,7 +20,8 @@ pub struct Statement {
 
 impl std::fmt::Display for Statement {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.token_literal()) // ?
+        write!(f, "Statement:")
+        //write!(f, "{}", self.token_literal()) // ?
     }
 }
 
@@ -46,11 +47,11 @@ impl StatementInterface for Statement {
 
 pub struct Identifier {
     pub token: Token,
-    //pub value: String,
 }
 
 impl std::fmt::Display for Identifier {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        //write!(f, "Identifier:")?;
         write!(f, "{}", self.token.literal)
     }
 }
@@ -73,8 +74,6 @@ impl Identifier {
 
 pub enum ExpressionType {
     NoExpression,
-    //Expression(Expression),
-
     Identifier(Identifier),
     Prefix(PrefixExpression),
     Infix(InfixExpression),
@@ -85,6 +84,7 @@ pub enum ExpressionType {
 
 impl std::fmt::Display for ExpressionType {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        //write!(f, "ExpressionType:")?;
         match self {
             ExpressionType::NoExpression => write!(f, "NoExpression"),
             ExpressionType::Prefix(prefix) => write!(f, "{}", prefix),
@@ -96,33 +96,6 @@ impl std::fmt::Display for ExpressionType {
         }
     }
 }
-
-/*
-pub struct Expression {
-    node: Node,
-}
-
-pub trait ExpressionInterface {
-    fn expression_node();
-}
-
-impl std::fmt::Display for Expression {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "Expression")
-    }
-}
-
-impl ExpressionInterface for Expression {
-    fn expression_node() {
-        todo!()
-    }
-}
-
-impl Expression {
-    pub fn new() -> Self {
-        Self { node: Node }
-    }
-}*/
 
 pub struct PrefixExpression {
     pub token: Token, // Bang or Minus at this point
@@ -142,13 +115,11 @@ impl PrefixExpression {
 
 impl std::fmt::Display for PrefixExpression {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(
-            f,
-            "PrefixExpression: token: {}, operator: {}, right: {}",
-            self.token,
-            self.operator,
-            format!("{}", self.right),
-        )
+        //write!(f, "PrefixExpression:")?;
+        write!(f, "(")?;
+        write!(f, "{}", self.operator)?;
+        write!(f, "{}", *self.right)?;
+        write!(f, ")")
     }
 }
 
@@ -172,7 +143,13 @@ impl InfixExpression {
 
 impl std::fmt::Display for InfixExpression {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "")
+        //write!(f, "InfixExpression:")?;
+        write!(f, "(")?;
+        write!(f, "{}", *self.left)?;
+        write!(f, " {}", self.operator)?;
+        write!(f, " {}", *self.right)?;
+        write!(f, ")")
+        //write!(f, "")
     }
 }
 
@@ -191,11 +168,11 @@ pub enum StatementType {
 
 impl std::fmt::Display for StatementType {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "StatementType::")?;
+        //write!(f, "StatementType:")?;
         match self {
-            StatementType::Let(s) => write!(f, "Let {}", s),
-            StatementType::Return(s) => write!(f, "Return {}", s),
-            StatementType::Expression(s) => write!(f, "Expression {}", s),
+            StatementType::Let(s) => write!(f, "{}", s),
+            StatementType::Return(s) => write!(f, "{}", s),
+            StatementType::Expression(s) => write!(f, "{}", s),
         }
     }
 }
@@ -206,9 +183,9 @@ pub struct Program {
 
 impl std::fmt::Display for Program {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "Program statements:\n")?;
+        //write!(f, "Program:")?;
         for (_i, s) in self.statements.iter().enumerate() {
-            write!(f, "{}\n", s)?;
+            write!(f, "{}", s)?;
         }
         write!(f, "")
     }
@@ -236,13 +213,7 @@ impl Program {
 // -----------------------------------------------------------------------------
 //  LetStatement
 // -----------------------------------------------------------------------------
-/*
-type LetStatement struct {
-    Token token.Token // the token.LET token
-    Name  *Identifier
-    Value Expression
-}
-*/
+
 pub struct LetStatement {
     pub token: Token,
     pub name: Option<Identifier>,
@@ -251,6 +222,7 @@ pub struct LetStatement {
 
 impl std::fmt::Display for LetStatement {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        //write!(f, "LetStatement:")?;
         write!(f, "{}", self.token_literal() + " ")?;
         let name: String = match &self.name {
             Some(ident) => format!("{}", ident),
@@ -295,6 +267,7 @@ pub struct ReturnStatement {
 
 impl std::fmt::Display for ReturnStatement {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "ReturnStatement:")?;
         write!(f, "{} ", self.token_literal())?;
         write!(f, "{}", self.return_value)?;
         write!(f, ";")
@@ -335,7 +308,8 @@ pub struct ExpressionStatement {
 
 impl std::fmt::Display for ExpressionStatement {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{} token: {}", self.expression, self.token)
+        //write!(f, "ExpressionStatement:")?;
+        write!(f, "{}", self.expression)//, self.token)
     }
 }
 
