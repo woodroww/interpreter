@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use crate::{
     ast::{
         BooleanExpression, Expression, ExpressionStatement, Identifier, InfixExpression,
-        LetStatement, PrefixExpression, Program, ReturnStatement, StatementType,
+        LetStatement, PrefixExpression, Program, ReturnStatement, StatementType, IfExpression, BlockStatement,
     },
     lexer::Lexer,
     token::{Token, TokenType},
@@ -110,6 +110,34 @@ fn parse_grouped_expression(parser: &mut Parser) -> Option<Expression> {
     }
 }
 
+fn parse_if_expression(parser: &mut Parser) -> Option<Expression> {
+    let mut expression = IfExpression::new(parser.current_clone());
+
+    if !parser.expect_peek(&TokenType::Lparen) {
+        return None;
+    }
+
+    parser.next_token();
+    expression.condition = match parser.parse_expression(Precedence::Lowest) {
+        Some(expression) => Some(Box::new(expression)),
+        None => None,
+    };
+
+    if !parser.expect_peek(&TokenType::Rparen) {
+        return None;
+    }
+
+    if !parser.expect_peek(&TokenType::Lbrace) {
+        return None;
+    }
+
+    expression.consequence = match parser.parse_block_statement() {
+        Some(expression) => Some(Box::new(expression)),
+        None => None,
+    };
+    Some(Expression::If(expression))
+}
+
 impl<'a> Parser<'a> {
     fn new(lexer: Lexer<'a>) -> Self {
         let precedences = HashMap::from([
@@ -142,6 +170,8 @@ impl<'a> Parser<'a> {
         parser.register_prefix(TokenType::True, parse_boolean);
         parser.register_prefix(TokenType::False, parse_boolean);
         parser.register_prefix(TokenType::Lparen, parse_grouped_expression);
+
+        parser.register_prefix(TokenType::If, parse_if_expression);
 
         parser.register_infix(TokenType::Plus, parse_infix_expression);
         parser.register_infix(TokenType::Minus, parse_infix_expression);
@@ -234,6 +264,21 @@ impl<'a> Parser<'a> {
         }
 
         left_exp
+    }
+
+    fn parse_block_statement(&mut self) -> Option<BlockStatement> {
+        let mut block = BlockStatement::new(self.current_clone());
+        self.next_token();
+
+        while !self.current_token_is(&TokenType::Rbrace) && self.current_token.is_some() {
+            let statement = self.parse_statement();
+            if statement.is_some() {
+                block.statements.push(statement.unwrap());
+            }
+            self.next_token();
+        }
+
+        Some(block)
     }
 
     fn no_prefix_parse_fn_error(&mut self, token: Token) {
@@ -861,8 +906,10 @@ return 993322;
         let lexer = Lexer::new(input);
         let mut parser = Parser::new(lexer);
         let program = parser.parse_program().unwrap();
-        let _error_string = check_parser_errors(&parser);
-        //println!("{}", program);
+        let error_string = check_parser_errors(&parser);
+        if error_string.is_some() {
+            println!("{}", error_string.unwrap());
+        }
         assert_eq!(program.statements.len(), 1);
 
         let statement = &program.statements[0];

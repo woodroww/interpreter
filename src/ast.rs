@@ -75,8 +75,14 @@ impl BooleanExpression {
 
 #[derive(Debug)]
 pub struct BlockStatement {
-    token: Token,
-    statements: Vec<StatementType>,
+    pub token: Token,
+    pub statements: Vec<StatementType>,
+}
+
+impl BlockStatement {
+    pub fn new(token: Token) -> Self {
+        Self { token, statements: Vec::new() }
+    }
 }
 
 impl std::fmt::Display for BlockStatement {
@@ -92,9 +98,15 @@ impl std::fmt::Display for BlockStatement {
 #[derive(Debug)]
 pub struct IfExpression {
     pub token: Token,
-    pub condition: Box<Expression>,
-    pub consequence: Box<BlockStatement>,
+    pub condition: Option<Box<Expression>>,
+    pub consequence: Option<Box<BlockStatement>>,
     pub alternative: Option<Box<BlockStatement>>,
+}
+
+impl IfExpression {
+    pub fn new(token: Token) -> Self {
+        Self { token, condition: None, consequence: None, alternative: None }
+    }
 }
 
 impl NodeInterface for IfExpression {
@@ -106,7 +118,15 @@ impl NodeInterface for IfExpression {
 impl std::fmt::Display for IfExpression {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         //write!(f, "IfExpression:")?;
-        write!(f, "if{} {}", self.condition, self.consequence)?;
+        let condition = match &self.condition {
+            Some(c) => format!("{}", c),
+            None => format!(""),
+        };
+        let consequence = match &self.consequence {
+            Some(c) => format!("{}", c),
+            None => format!(""),
+        };
+        write!(f, "if{} {}", condition, consequence)?;
         match &self.alternative {
             Some(alt) => {
                 write!(f, "else {}", alt)
