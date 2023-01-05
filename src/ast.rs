@@ -1,50 +1,26 @@
-use crate::token::{TokenType, Token};
+use crate::token::Token;
 
 // -----------------------------------------------------------------------------
-//  Node
+//  NodeInterface 
 // -----------------------------------------------------------------------------
-
-pub struct Node;
 
 pub trait NodeInterface {
     fn token_literal(&self) -> String;
 }
 
 // -----------------------------------------------------------------------------
-//  Statement
+//  StatementInterface
 // -----------------------------------------------------------------------------
-
-pub struct Statement {
-    node: Node,
-}
-
-impl std::fmt::Display for Statement {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "Statement:")
-        //write!(f, "{}", self.token_literal()) // ?
-    }
-}
 
 pub trait StatementInterface {
     fn statement_node();
 }
 
-impl NodeInterface for Statement {
-    fn token_literal(&self) -> String {
-        "statement".to_string()
-    }
-}
-
-impl StatementInterface for Statement {
-    fn statement_node() {
-        todo!()
-    }
-}
-
 // -----------------------------------------------------------------------------
-// Identifier
+//  Identifier
 // -----------------------------------------------------------------------------
 
+#[derive(Debug)]
 pub struct Identifier {
     pub token: Token,
 }
@@ -64,7 +40,36 @@ impl NodeInterface for Identifier {
 
 impl Identifier {
     pub fn new(token: Token) -> Self {
-        Identifier { token }
+        Self { token }
+    }
+}
+
+#[derive(Debug)]
+pub struct BooleanExpression {
+    pub token: Token,
+    pub value: bool,
+}
+
+impl std::fmt::Display for BooleanExpression {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.token.literal)
+    }
+}
+
+impl NodeInterface for BooleanExpression {
+    fn token_literal(&self) -> String {
+        self.token.literal.clone()
+    }
+}
+
+impl BooleanExpression {
+    pub fn new(token: Token) -> Self {
+        let value = match &token.literal as &str {
+            "true" => true,
+            "false" => false,
+            _ => panic!("invalid value for a Boolean"),
+        };
+        Self { token, value }
     }
 }
 
@@ -72,35 +77,39 @@ impl Identifier {
 //  Expression
 // -----------------------------------------------------------------------------
 
-pub enum ExpressionType {
+#[derive(Debug)]
+pub enum Expression {
     NoExpression,
     Identifier(Identifier),
     Prefix(PrefixExpression),
     Infix(InfixExpression),
     Int(usize),
+    Boolean(BooleanExpression),
     Return,
     Assign,
 }
 
-impl std::fmt::Display for ExpressionType {
+impl std::fmt::Display for Expression {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         //write!(f, "ExpressionType:")?;
         match self {
-            ExpressionType::NoExpression => write!(f, "NoExpression"),
-            ExpressionType::Prefix(prefix) => write!(f, "{}", prefix),
-            ExpressionType::Identifier(ident) => write!(f, "{}", ident),
-            ExpressionType::Int(integer) => write!(f, "{}", integer),
-            ExpressionType::Infix(infix) => write!(f, "{}", infix), 
-            ExpressionType::Return => write!(f, "return"),
-            ExpressionType::Assign => write!(f, "="),
+            Expression::NoExpression => write!(f, "NoExpression"),
+            Expression::Prefix(prefix) => write!(f, "{}", prefix),
+            Expression::Identifier(ident) => write!(f, "{}", ident),
+            Expression::Int(integer) => write!(f, "{}", integer),
+            Expression::Infix(infix) => write!(f, "{}", infix), 
+            Expression::Return => write!(f, "return"),
+            Expression::Assign => write!(f, "="),
+            Expression::Boolean(b) => write!(f, "{}", b.value),
         }
     }
 }
 
+#[derive(Debug)]
 pub struct PrefixExpression {
     pub token: Token, // Bang or Minus at this point
     pub operator: String,
-    pub right: Box<ExpressionType>,
+    pub right: Box<Expression>,
 }
 
 impl PrefixExpression {
@@ -108,7 +117,7 @@ impl PrefixExpression {
         Self {
             token,
             operator: operator.to_string(),
-            right: Box::new(ExpressionType::NoExpression),
+            right: Box::new(Expression::NoExpression),
         }
     }
 }
@@ -123,20 +132,21 @@ impl std::fmt::Display for PrefixExpression {
     }
 }
 
+#[derive(Debug)]
 pub struct InfixExpression {
     pub token: Token,
-    pub left: Box<ExpressionType>,
+    pub left: Box<Expression>,
     pub operator: String,
-    pub right: Box<ExpressionType>,
+    pub right: Box<Expression>,
 }
 
 impl InfixExpression {
-    pub fn new(token: Token, operator: &str, left: ExpressionType) -> Self {
+    pub fn new(token: Token, operator: &str, left: Expression) -> Self {
         Self {
             token,
             left: Box::new(left),
             operator: operator.to_string(),
-            right: Box::new(ExpressionType::NoExpression),
+            right: Box::new(Expression::NoExpression),
         }
     }
 }
@@ -217,7 +227,7 @@ impl Program {
 pub struct LetStatement {
     pub token: Token,
     pub name: Option<Identifier>,
-    pub value: ExpressionType,
+    pub value: Expression,
 }
 
 impl std::fmt::Display for LetStatement {
@@ -239,7 +249,7 @@ impl LetStatement {
         Self {
             token,
             name: None,
-            value: ExpressionType::NoExpression,
+            value: Expression::NoExpression,
         }
     }
 }
@@ -262,7 +272,7 @@ impl NodeInterface for LetStatement {
 
 pub struct ReturnStatement {
     pub token: Token,
-    pub return_value: ExpressionType,
+    pub return_value: Expression,
 }
 
 impl std::fmt::Display for ReturnStatement {
@@ -290,7 +300,7 @@ impl ReturnStatement {
     pub fn new(token: Token) -> Self {
         Self {
             token,
-            return_value: ExpressionType::Return,
+            return_value: Expression::Return,
         }
     }
 }
@@ -303,7 +313,7 @@ impl ReturnStatement {
 
 pub struct ExpressionStatement {
     pub token: Token,
-    pub expression: ExpressionType,
+    pub expression: Expression,
 }
 
 impl std::fmt::Display for ExpressionStatement {
@@ -329,7 +339,7 @@ impl ExpressionStatement {
     pub fn new(token: Token) -> Self {
         Self {
             token,
-            expression: ExpressionType::NoExpression,
+            expression: Expression::NoExpression,
         }
     }
 }
@@ -338,13 +348,14 @@ impl ExpressionStatement {
 mod test {
     use super::*;
     use pretty_assertions::assert_eq;
+    use crate::token::TokenType;
 
     #[test]
     fn test_display() { // TestString in book
         let program = Program::new();
         let mut let_statement = LetStatement::new(Token::new(TokenType::Let, "let"));
         let_statement.name = Some(Identifier::new(Token::new(TokenType::Ident, "myVar")));
-        let_statement.value = ExpressionType::Identifier(Identifier::new(Token::new(TokenType::Ident, "anotherVar")));
+        let_statement.value = Expression::Identifier(Identifier::new(Token::new(TokenType::Ident, "anotherVar")));
         
         assert_eq!(&format!("{}", let_statement), "let myVar = anotherVar;");
     }

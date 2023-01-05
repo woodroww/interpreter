@@ -2,50 +2,23 @@ use std::collections::HashMap;
 
 use crate::{
     ast::{
-        ExpressionStatement, ExpressionType, Identifier, InfixExpression, LetStatement,
-        PrefixExpression, Program, ReturnStatement, StatementType,
+        Expression, ExpressionStatement, Identifier, InfixExpression, LetStatement,
+        PrefixExpression, Program, ReturnStatement, StatementType, BooleanExpression,
     },
     lexer::Lexer,
     token::{Token, TokenType},
 };
 
-/*
-    prefixParseFns map[token.TokenType]prefixParseFn
-    infixParseFns  map[token.TokenType]infixParseFn
-
-    p.registerPrefix(token.IDENT, p.parseIdentifier)
-    fn parse_identifier(&mut self) -> Option<Identifier> {
-
-    p.registerPrefix(token.INT, p.parseIntegerLiteral)
-    in parse_expression Some(ExpressionType::Int(value))
-
-    p.registerPrefix(token.BANG, p.parsePrefixExpression)
-    fn parse_prefix(&mut self) -> PrefixExpression {
-
-    p.registerPrefix(token.MINUS, p.parsePrefixExpression)
-    fn parse_infix(&mut self, lhs: ExpressionType) -> InfixExpression {
-
-// not yet
+/* not yet
     p.registerPrefix(token.TRUE, p.parseBoolean)
     p.registerPrefix(token.FALSE, p.parseBoolean)
     p.registerPrefix(token.LPAREN, p.parseGroupedExpression)
     p.registerPrefix(token., p.)
 
-
-    fn parse_infix(&mut self, lhs: ExpressionType) -> InfixExpression {
-
-    p.registerInfix(token.PLUS, p.parseInfixExpression)
-    p.registerInfix(token.MINUS, p.parseInfixExpression)
-    p.registerInfix(token.SLASH, p.parseInfixExpression)
-    p.registerInfix(token.ASTERISK, p.parseInfixExpression)
-    p.registerInfix(token.EQ, p.parseInfixExpression)
-    p.registerInfix(token.NOT_EQ, p.parseInfixExpression)
-    p.registerInfix(token.LT, p.parseInfixExpression)
-    p.registerInfix(token.GT, p.parseInfixExpression)
-
 // not yet
     p.registerInfix(token.LPAREN, p.parseCallExpression)
 */
+
 /*
 identifiers as arguments in a function call
 add(foobar, barfoo);
@@ -78,25 +51,31 @@ struct Parser<'a> {
     precedences: HashMap<TokenType, Precedence>,
 }
 
-type ParseFn = fn(&mut Parser) -> Option<ExpressionType>;
-type ParseInfixFn = fn(&mut Parser, ExpressionType) -> Option<ExpressionType>;
+type ParseFn = fn(&mut Parser) -> Option<Expression>;
+type ParseInfixFn = fn(&mut Parser, Expression) -> Option<Expression>;
 
-fn parse_identifier(parser: &mut Parser) -> Option<ExpressionType> {
-    Some(ExpressionType::Identifier(Identifier::new(
-        parser.current_clone()
+fn parse_identifier(parser: &mut Parser) -> Option<Expression> {
+    Some(Expression::Identifier(Identifier::new(
+        parser.current_clone(),
     )))
 }
 
-fn parse_integer_literal(parser: &mut Parser) -> Option<ExpressionType> {
+fn parse_integer_literal(parser: &mut Parser) -> Option<Expression> {
     let token = parser.current_clone();
     if let TokenType::Int = token.token_type {
-        Some(ExpressionType::Int(token.literal.parse::<usize>().unwrap()))
+        Some(Expression::Int(token.literal.parse::<usize>().unwrap()))
     } else {
         panic!("where is my integer");
     }
 }
 
-fn parse_prefix_expression(parser: &mut Parser) -> Option<ExpressionType> {
+fn parse_boolean(parser: &mut Parser) -> Option<Expression> {
+    let token = parser.current_clone();
+    let expression = BooleanExpression::new(token);
+    Some(Expression::Boolean(expression))
+}
+
+fn parse_prefix_expression(parser: &mut Parser) -> Option<Expression> {
     let token = parser.current_clone();
     let literal = token.literal.clone();
     let mut expression = PrefixExpression::new(token, &literal);
@@ -104,13 +83,13 @@ fn parse_prefix_expression(parser: &mut Parser) -> Option<ExpressionType> {
     let right = parser.parse_expression(Precedence::Prefix);
     let right = match right {
         Some(exp) => exp,
-        None => ExpressionType::NoExpression,
+        None => Expression::NoExpression,
     };
     expression.right = Box::new(right);
-    Some(ExpressionType::Prefix(expression))
+    Some(Expression::Prefix(expression))
 }
 
-fn parse_infix_expression(parser: &mut Parser, left: ExpressionType) -> Option<ExpressionType> {
+fn parse_infix_expression(parser: &mut Parser, left: Expression) -> Option<Expression> {
     let token = parser.current_clone();
     let literal = token.literal.clone();
     let mut expression = InfixExpression::new(token, &literal, left);
@@ -119,10 +98,10 @@ fn parse_infix_expression(parser: &mut Parser, left: ExpressionType) -> Option<E
     let right = parser.parse_expression(precedence);
     let right = match right {
         Some(exp) => exp,
-        None => ExpressionType::NoExpression,
+        None => Expression::NoExpression,
     };
     expression.right = Box::new(right);
-    Some(ExpressionType::Infix(expression))
+    Some(Expression::Infix(expression))
 }
 
 impl<'a> Parser<'a> {
@@ -153,6 +132,9 @@ impl<'a> Parser<'a> {
         parser.register_prefix(TokenType::Int, parse_integer_literal);
         parser.register_prefix(TokenType::Bang, parse_prefix_expression);
         parser.register_prefix(TokenType::Minus, parse_prefix_expression);
+
+        parser.register_prefix(TokenType::True, parse_boolean);
+        parser.register_prefix(TokenType::False, parse_boolean);
 
         parser.register_infix(TokenType::Plus, parse_infix_expression);
         parser.register_infix(TokenType::Minus, parse_infix_expression);
@@ -213,7 +195,7 @@ impl<'a> Parser<'a> {
         let mut statement = ExpressionStatement::new(self.current_clone());
         statement.expression = match self.parse_expression(Precedence::Lowest) {
             Some(e) => e,
-            None => ExpressionType::NoExpression,
+            None => Expression::NoExpression,
         };
 
         if self.peek_token_is(&TokenType::Semicolon) {
@@ -224,7 +206,7 @@ impl<'a> Parser<'a> {
     }
 
     // page 70
-    fn parse_expression(&mut self, precedence: Precedence) -> Option<ExpressionType> {
+    fn parse_expression(&mut self, precedence: Precedence) -> Option<Expression> {
         //println!("parse_expression");
         let token = self.current_clone();
         let mut left_exp = match self.prefix_fns.get(&token.token_type) {
@@ -269,7 +251,8 @@ impl<'a> Parser<'a> {
                     .expect("we checked above")
                     .token_type,
             )
-            .expect("there has to be an entry for this").clone()
+            .expect("there has to be an entry for this")
+            .clone()
     }
 
     fn current_precedence(&self) -> Precedence {
@@ -391,7 +374,7 @@ impl<'a> Parser<'a> {
         exp
     }
 
-    fn parse_infix(&mut self, lhs: ExpressionType) -> InfixExpression {
+    fn parse_infix(&mut self, lhs: Expression) -> InfixExpression {
         let token = self.current_clone();
         let literal = token.literal.clone();
         let mut expression = InfixExpression::new(token, &literal, lhs);
@@ -410,7 +393,7 @@ mod test {
 
     use super::*;
     use crate::ast::NodeInterface;
-    //use pretty_assertions::assert_eq;
+    use pretty_assertions::assert_eq;
 
     fn test_let_statement(s: &LetStatement, name: &str) {
         assert_eq!(s.token_literal(), "let");
@@ -428,6 +411,70 @@ mod test {
             error_string.push_str(&format!("parser error: {}\n", e));
         }
         Some(error_string)
+    }
+
+    fn test_integer_literal(statement: &ExpressionStatement, value: usize) {
+        if let Expression::Int(n) = statement.expression {
+            assert_eq!(n, value);
+        } else {
+            panic!(
+                "expected ExpressionType::Int, got {} instead",
+                statement.expression
+            );
+        }
+        assert_eq!(statement.token_literal(), "5");
+    }
+
+    fn test_identifier(statement: &ExpressionStatement, value: &str) {
+        if let Expression::Identifier(ident) = &statement.expression {
+            assert_eq!(ident.token_literal(), value);
+        } else {
+            panic!(
+                "expected Expression::Identifier, got {} instead",
+                statement.expression
+            );
+        }
+    }
+
+    // page 80
+    /*fn test_literal_expression(expression: &Expression, expected: &Expression) {
+        if *expression != *expected { 
+            panic!();
+        }
+    }*/
+
+    fn test_infix_expression(statement: &StatementType, left: usize, operator: &str, right: usize) {
+        if let StatementType::Expression(expression_statement) = &statement {
+            if let Expression::Infix(infix_expression) = &expression_statement.expression {
+                if let Expression::Int(n) = *infix_expression.left {
+                    assert_eq!(n, left);
+                } else {
+                    panic!(
+                        "expected ExpressionType::Int, got {} instead",
+                        infix_expression.left
+                    );
+                }
+                assert_eq!(infix_expression.operator, operator);
+                if let Expression::Int(n) = *infix_expression.right {
+                    assert_eq!(n, right);
+                } else {
+                    panic!(
+                        "expected ExpressionType::Int, got {} instead",
+                        infix_expression.right
+                    );
+                }
+            } else {
+                panic!(
+                    "expected ExpressionType::Infix, got {} instead",
+                    expression_statement.expression
+                );
+            }
+        } else {
+            panic!(
+                "expected StatementType::Expression, got {} instead",
+                statement
+            );
+        }
     }
 
     #[test]
@@ -499,6 +546,7 @@ return 993322;
         }
     }
 
+
     #[test]
     fn test_identifier_expression() {
         let input = "foobar;";
@@ -511,14 +559,7 @@ return 993322;
 
         let statement = &program.statements[0];
         if let StatementType::Expression(expression_statement) = statement {
-            if let ExpressionType::Identifier(ident) = &expression_statement.expression {
-                assert_eq!(ident.token_literal(), "foobar");
-            } else {
-                panic!(
-                    "expected ExpressionType::Identifier, got {} instead",
-                    expression_statement.expression
-                );
-            }
+            test_identifier(expression_statement, "foobar");
         } else {
             panic!(
                 "expected StatementType::Expression, got {} instead",
@@ -539,15 +580,7 @@ return 993322;
 
         let statement = &program.statements[0];
         if let StatementType::Expression(expression_statement) = statement {
-            if let ExpressionType::Int(n) = expression_statement.expression {
-                assert_eq!(n, 5);
-            } else {
-                panic!(
-                    "expected ExpressionType::Int, got {} instead",
-                    expression_statement.expression
-                );
-            }
-            assert_eq!(expression_statement.token_literal(), "5");
+            test_integer_literal(expression_statement, 5);
         } else {
             panic!(
                 "expected StatementType::Expression, got {} instead",
@@ -572,8 +605,7 @@ return 993322;
 
             let statement = &program.statements[0];
             if let StatementType::Expression(expression_statement) = statement {
-                if let ExpressionType::Prefix(prefix_expression) = &expression_statement.expression
-                {
+                if let Expression::Prefix(prefix_expression) = &expression_statement.expression {
                     if prefix_expression.operator == operator {
                     } else {
                         panic!(
@@ -617,37 +649,7 @@ return 993322;
             assert_eq!(program.statements.len(), 1);
 
             let statement = &program.statements[0];
-            if let StatementType::Expression(expression_statement) = &statement {
-                if let ExpressionType::Infix(infix_expression) = &expression_statement.expression {
-                    if let ExpressionType::Int(n) = *infix_expression.left {
-                        assert_eq!(n, left);
-                    } else {
-                        panic!(
-                            "expected ExpressionType::Int, got {} instead",
-                            infix_expression.left
-                        );
-                    }
-                    assert_eq!(infix_expression.operator, operator);
-                    if let ExpressionType::Int(n) = *infix_expression.right {
-                        assert_eq!(n, right);
-                    } else {
-                        panic!(
-                            "expected ExpressionType::Int, got {} instead",
-                            infix_expression.right
-                        );
-                    }
-                } else {
-                    panic!(
-                        "expected ExpressionType::Infix, got {} instead",
-                        expression_statement.expression
-                    );
-                }
-            } else {
-                panic!(
-                    "expected StatementType::Expression, got {} instead",
-                    statement
-                );
-            }
+            test_infix_expression(statement, left, operator, right);
         }
     }
 
@@ -683,7 +685,6 @@ return 993322;
             "((3 + (4 * 5)) == ((3 * 1) + (4 * 5)))",
         ];
 
-
         for (input, expected) in inputs.into_iter().zip(expecteds) {
             let lexer = Lexer::new(input);
             let mut parser = Parser::new(lexer);
@@ -692,5 +693,28 @@ return 993322;
             assert_eq!(expected, format!("{}", program));
         }
     }
-}
 
+    #[test]
+    fn test_boolean_expression() {
+        let inputs = vec!["true;", "false;"];
+        let expecteds = vec![true, false];
+
+        for (input, expected) in inputs.into_iter().zip(expecteds) {
+            let lexer = Lexer::new(input);
+            let mut parser = Parser::new(lexer);
+            let program = parser.parse_program().unwrap();
+            let _error_string = check_parser_errors(&parser);
+            assert_eq!(program.statements.len(), 1);
+            let statement = &program.statements[0];
+            if let StatementType::Expression(e) = statement {
+                if let Expression::Boolean(b) = &e.expression {
+                    assert_eq!(b.value, expected);
+                } else {
+                    panic!("expected Expression::Boolean, got {}", &e.expression);
+                }
+            } else {
+                panic!("StatementType is not an Expression, got {}", statement);
+            }
+        }
+    }
+}
