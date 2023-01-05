@@ -104,6 +104,16 @@ fn parse_infix_expression(parser: &mut Parser, left: Expression) -> Option<Expre
     Some(Expression::Infix(expression))
 }
 
+fn parse_grouped_expression(parser: &mut Parser) -> Option<Expression> {
+    parser.next_token();
+    let expression = parser.parse_expression(Precedence::Lowest);
+    if !parser.expect_peek(&TokenType::Rparen) {
+        None
+    } else {
+        expression
+    }
+}
+
 impl<'a> Parser<'a> {
     fn new(lexer: Lexer<'a>) -> Self {
         let precedences = HashMap::from([
@@ -135,6 +145,7 @@ impl<'a> Parser<'a> {
 
         parser.register_prefix(TokenType::True, parse_boolean);
         parser.register_prefix(TokenType::False, parse_boolean);
+        parser.register_prefix(TokenType::Lparen, parse_grouped_expression);
 
         parser.register_infix(TokenType::Plus, parse_infix_expression);
         parser.register_infix(TokenType::Minus, parse_infix_expression);
@@ -239,20 +250,19 @@ impl<'a> Parser<'a> {
 
     fn peek_precedence(&self) -> Precedence {
         let peek = match &self.peek_token {
-            Some(token) => token.literal.clone(),
+            Some(token) => token,
             None => return Precedence::Lowest,
         };
         //println!("peek_precedence: current: {}, peek: {}", self.current_clone(), peek);
-        self.precedences
-            .get(
-                &self
+        let token_type = &self
                     .peek_token
                     .as_ref()
                     .expect("we checked above")
-                    .token_type,
-            )
-            .expect("there has to be an entry for this")
-            .clone()
+                    .token_type;
+        match self.precedences.get(&token_type) {
+            Some(precedence) => precedence.clone(),
+            None => Precedence::Lowest, 
+        }
     }
 
     fn current_precedence(&self) -> Precedence {
@@ -625,20 +635,36 @@ return 993322;
         }
     }
 
+    struct Data<T> {
+        input: String,
+        left_value: T,
+        operator: String,
+        right_value: T,
+    }
+    impl<T> Data<T> {
+        pub fn new(input: &str, left_value: T, operator: &str, right_value: T) -> Self {
+            Self { input: input.to_string(), left_value, operator: operator.to_string(), right_value }
+        }
+    }
+
     #[test]
     fn test_parsing_infix_expressions() {
-        let inputs = vec![
-            "5 + 5;", "5 - 5;", "5 * 5;", "5 / 5;", "5 > 5;", "5 < 5;", "5 == 5;", "5 != 5;",
+        let data = vec![
+            Data::new("5 + 5;", 5, "+", 5),
+            Data::new("5 - 5;", 5, "-", 5),
+            Data::new("5 * 5;", 5, "*", 5),
+            Data::new("5 / 5;", 5, "/", 5),
+            Data::new("5 > 5;", 5, ">", 5),
+            Data::new("5 < 5;", 5, "<", 5),
+            Data::new("5 == 5;", 5, "==", 5),
+            Data::new("5 != 5;", 5, "!=", 5),
         ];
-        let left_values = vec![5, 5, 5, 5, 5, 5, 5, 5];
-        let operators = vec!["+", "-", "*", "/", ">", "<", "==", "!="];
-        let right_values = vec![5, 5, 5, 5, 5, 5, 5, 5];
 
-        for i in 0..inputs.len() {
-            let input = inputs[i];
-            let left = left_values[i];
-            let operator = operators[i];
-            let right = right_values[i];
+        for i in 0..data.len() {
+            let input = &data[i].input;
+            let left = data[i].left_value;
+            let operator = &data[i].operator;
+            let right = data[i].right_value;
 
             let lexer = Lexer::new(input);
             let mut parser = Parser::new(lexer);
@@ -650,6 +676,64 @@ return 993322;
 
             let statement = &program.statements[0];
             test_infix_expression(statement, left, operator, right);
+        }
+    }
+
+    #[test]
+    fn test_mor_parsing_infix_expressions() {
+        let data = vec![
+            Data::new("true == true", true, "==", true),
+            Data::new("true != false", true, "!=", false),
+            Data::new("false == false", false, "==", false),
+        ];
+
+        for i in 0..data.len() {
+            let input = &data[i].input;
+            let left = data[i].left_value;
+            let operator = &data[i].operator;
+            let right = data[i].right_value;
+
+            let lexer = Lexer::new(input);
+            let mut parser = Parser::new(lexer);
+            let program = parser.parse_program().unwrap();
+            let _error_string = check_parser_errors(&parser);
+
+            println!("{}", program);
+            assert_eq!(program.statements.len(), 1);
+
+            let statement = &program.statements[0];
+            
+            if let StatementType::Expression(expression_statement) = &statement {
+                if let Expression::Infix(infix_expression) = &expression_statement.expression {
+                    if let Expression::Boolean(n) = &*infix_expression.left {
+                        assert_eq!(n.value, left);
+                    } else {
+                        panic!(
+                            "expected ExpressionType::Int, got {} instead",
+                            infix_expression.left
+                        );
+                    }
+                    assert_eq!(&infix_expression.operator, operator);
+                    if let Expression::Boolean(n) = &*infix_expression.right {
+                        assert_eq!(n.value, right);
+                    } else {
+                        panic!(
+                            "expected ExpressionType::Int, got {} instead",
+                            infix_expression.right
+                        );
+                    }
+                } else {
+                    panic!(
+                        "expected ExpressionType::Infix, got {} instead",
+                        expression_statement.expression
+                    );
+                }
+            } else {
+                panic!(
+                    "expected StatementType::Expression, got {} instead",
+                    statement
+                );
+            }
         }
     }
 
@@ -668,6 +752,20 @@ return 993322;
             "5 > 4 == 3 < 4",
             "5 < 4 != 3 > 4",
             "3 + 4 * 5 == 3 * 1 + 4 * 5",
+			"true",
+			"false",
+			"3 > 5 == false",
+			"3 < 5 == true",
+			"1 + (2 + 3) + 4",
+			"(5 + 5) * 2",
+			"2 / (5 + 5)",
+			"(5 + 5) * 2 * (5 + 5)",
+			"-(5 + 5)",
+			"!(true == true)",
+
+			"a + add(b * c) + d",
+			"add(a, b, 1, 2 * 3, 4 + 5, add(6, 7 * 8))",
+			"add(a + b + c * d / f + g)",
         ];
 
         let expecteds = vec![
@@ -683,9 +781,24 @@ return 993322;
             "((5 > 4) == (3 < 4))",
             "((5 < 4) != (3 > 4))",
             "((3 + (4 * 5)) == ((3 * 1) + (4 * 5)))",
+			"true",
+			"false",
+            "((3 > 5) == false)",
+			"((3 < 5) == true)",
+			"((1 + (2 + 3)) + 4)",
+			"((5 + 5) * 2)",
+			"(2 / (5 + 5))",
+			"(((5 + 5) * 2) * (5 + 5))",
+			"(-(5 + 5))",
+			"(!(true == true))",
+
+			"((a + add((b * c))) + d)",
+			"add(a, b, 1, (2 * 3), (4 + 5), add(6, (7 * 8)))",
+			"add((((a + b) + ((c * d) / f)) + g))",
         ];
 
         for (input, expected) in inputs.into_iter().zip(expecteds) {
+            //println!("testing: {} == {}", input, expected);
             let lexer = Lexer::new(input);
             let mut parser = Parser::new(lexer);
             let program = parser.parse_program().unwrap();
