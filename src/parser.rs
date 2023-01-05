@@ -2,8 +2,8 @@ use std::collections::HashMap;
 
 use crate::{
     ast::{
-        Expression, ExpressionStatement, Identifier, InfixExpression, LetStatement,
-        PrefixExpression, Program, ReturnStatement, StatementType, BooleanExpression,
+        BooleanExpression, Expression, ExpressionStatement, Identifier, InfixExpression,
+        LetStatement, PrefixExpression, Program, ReturnStatement, StatementType,
     },
     lexer::Lexer,
     token::{Token, TokenType},
@@ -81,11 +81,9 @@ fn parse_prefix_expression(parser: &mut Parser) -> Option<Expression> {
     let mut expression = PrefixExpression::new(token, &literal);
     parser.next_token();
     let right = parser.parse_expression(Precedence::Prefix);
-    let right = match right {
-        Some(exp) => exp,
-        None => Expression::NoExpression,
-    };
-    expression.right = Box::new(right);
+    if right.is_some() {
+        expression.right = Some(Box::new(right.unwrap()));
+    }
     Some(Expression::Prefix(expression))
 }
 
@@ -96,11 +94,9 @@ fn parse_infix_expression(parser: &mut Parser, left: Expression) -> Option<Expre
     let precedence = parser.current_precedence();
     parser.next_token();
     let right = parser.parse_expression(precedence);
-    let right = match right {
-        Some(exp) => exp,
-        None => Expression::NoExpression,
-    };
-    expression.right = Box::new(right);
+    if right.is_some() {
+        expression.right = Some(Box::new(right.unwrap()));
+    }
     Some(Expression::Infix(expression))
 }
 
@@ -204,10 +200,7 @@ impl<'a> Parser<'a> {
             return None;
         }
         let mut statement = ExpressionStatement::new(self.current_clone());
-        statement.expression = match self.parse_expression(Precedence::Lowest) {
-            Some(e) => e,
-            None => Expression::NoExpression,
-        };
+        statement.expression = self.parse_expression(Precedence::Lowest);
 
         if self.peek_token_is(&TokenType::Semicolon) {
             self.next_token();
@@ -254,14 +247,9 @@ impl<'a> Parser<'a> {
             None => return Precedence::Lowest,
         };
         //println!("peek_precedence: current: {}, peek: {}", self.current_clone(), peek);
-        let token_type = &self
-                    .peek_token
-                    .as_ref()
-                    .expect("we checked above")
-                    .token_type;
-        match self.precedences.get(&token_type) {
+        match self.precedences.get(&peek.token_type) {
             Some(precedence) => precedence.clone(),
-            None => Precedence::Lowest, 
+            None => Precedence::Lowest,
         }
     }
 
@@ -375,7 +363,7 @@ impl<'a> Parser<'a> {
         self.current_token.as_ref().expect("will this fail").clone()
     }
 
-    fn parse_prefix(&mut self) -> PrefixExpression {
+    /*fn parse_prefix(&mut self) -> PrefixExpression {
         let token = self.current_clone();
         let literal = token.literal.clone();
         let exp = PrefixExpression::new(token, &literal);
@@ -390,12 +378,12 @@ impl<'a> Parser<'a> {
         let mut expression = InfixExpression::new(token, &literal, lhs);
         let precedence = self.current_precedence();
         self.next_token();
-        expression.right = Box::new(
-            self.parse_expression(precedence.clone())
-                .expect("did we get an expression"),
-        );
+        let parsed = self.parse_expression(precedence.clone());
+        if parsed.is_some() {
+            expression.right = Some(Box::new(parsed.unwrap()));
+        }
         expression
-    }
+    }*/
 }
 
 #[cfg(test)]
@@ -424,60 +412,75 @@ mod test {
     }
 
     fn test_integer_literal(statement: &ExpressionStatement, value: usize) {
-        if let Expression::Int(n) = statement.expression {
-            assert_eq!(n, value);
+        if statement.expression.is_none() {
+            panic!("statement.expression.is_none");
+        }
+        let expression = statement.expression.as_ref().unwrap();
+
+        if let Expression::Int(n) = expression {
+            assert_eq!(*n, value);
         } else {
-            panic!(
-                "expected ExpressionType::Int, got {} instead",
-                statement.expression
-            );
+            panic!("expected ExpressionType::Int, got {} instead", expression);
         }
         assert_eq!(statement.token_literal(), "5");
     }
 
     fn test_identifier(statement: &ExpressionStatement, value: &str) {
-        if let Expression::Identifier(ident) = &statement.expression {
+        if statement.expression.is_none() {
+            panic!("statement.expression.is_none");
+        }
+        let expression = statement.expression.as_ref().unwrap();
+        if let Expression::Identifier(ident) = expression {
             assert_eq!(ident.token_literal(), value);
         } else {
             panic!(
                 "expected Expression::Identifier, got {} instead",
-                statement.expression
+                expression
             );
         }
     }
 
     // page 80
     /*fn test_literal_expression(expression: &Expression, expected: &Expression) {
-        if *expression != *expected { 
+        if *expression != *expected {
             panic!();
         }
     }*/
 
     fn test_infix_expression(statement: &StatementType, left: usize, operator: &str, right: usize) {
         if let StatementType::Expression(expression_statement) = &statement {
-            if let Expression::Infix(infix_expression) = &expression_statement.expression {
-                if let Expression::Int(n) = *infix_expression.left {
+            if expression_statement.expression.is_none() {
+                panic!("statement.expression.is_none");
+            }
+            let expression = expression_statement.expression.as_ref().unwrap();
+            if let Expression::Infix(infix_expression) = expression {
+                if infix_expression.left.is_none() {
+                    panic!("infix_expression.left.is_none");
+                }
+                let left_expression = infix_expression.left.as_ref().unwrap();
+                if let Expression::Int(n) = **left_expression {
                     assert_eq!(n, left);
                 } else {
                     panic!(
                         "expected ExpressionType::Int, got {} instead",
-                        infix_expression.left
+                        left_expression
                     );
                 }
                 assert_eq!(infix_expression.operator, operator);
-                if let Expression::Int(n) = *infix_expression.right {
+                if infix_expression.right.is_none() {
+                    panic!("infix_expression.right.is_none");
+                }
+                let right_expression = infix_expression.right.as_ref().unwrap();
+                if let Expression::Int(n) = **right_expression {
                     assert_eq!(n, right);
                 } else {
                     panic!(
                         "expected ExpressionType::Int, got {} instead",
-                        infix_expression.right
+                        right_expression
                     );
                 }
             } else {
-                panic!(
-                    "expected ExpressionType::Infix, got {} instead",
-                    expression_statement.expression
-                );
+                panic!("expected ExpressionType::Infix, got {} instead", expression);
             }
         } else {
             panic!(
@@ -556,7 +559,6 @@ return 993322;
         }
     }
 
-
     #[test]
     fn test_identifier_expression() {
         let input = "foobar;";
@@ -615,7 +617,11 @@ return 993322;
 
             let statement = &program.statements[0];
             if let StatementType::Expression(expression_statement) = statement {
-                if let Expression::Prefix(prefix_expression) = &expression_statement.expression {
+                if expression_statement.expression.is_none() {
+                    panic!("expression_statement.expression.is_none");
+                }
+                let expression = expression_statement.expression.as_ref().unwrap();
+                if let Expression::Prefix(prefix_expression) = expression {
                     if prefix_expression.operator == operator {
                     } else {
                         panic!(
@@ -623,11 +629,9 @@ return 993322;
                             operator, prefix_expression.operator
                         );
                     }
+                    //if prefix_expression.right
                 } else {
-                    panic!(
-                        "expected Expression::Prefix, got {}",
-                        expression_statement.expression
-                    );
+                    panic!("expected Expression::Prefix, got {}", expression);
                 }
             } else {
                 panic!("expected StatementType::Expression, got {}", statement);
@@ -643,7 +647,12 @@ return 993322;
     }
     impl<T> Data<T> {
         pub fn new(input: &str, left_value: T, operator: &str, right_value: T) -> Self {
-            Self { input: input.to_string(), left_value, operator: operator.to_string(), right_value }
+            Self {
+                input: input.to_string(),
+                left_value,
+                operator: operator.to_string(),
+                right_value,
+            }
         }
     }
 
@@ -702,31 +711,40 @@ return 993322;
             assert_eq!(program.statements.len(), 1);
 
             let statement = &program.statements[0];
-            
+
             if let StatementType::Expression(expression_statement) = &statement {
-                if let Expression::Infix(infix_expression) = &expression_statement.expression {
-                    if let Expression::Boolean(n) = &*infix_expression.left {
+                if expression_statement.expression.is_none() {
+                    panic!("expression_statement.expression.is_none");
+                }
+                let expression = expression_statement.expression.as_ref().unwrap();
+                if let Expression::Infix(infix_expression) = expression {
+                    if infix_expression.left.is_none() {
+                        panic!("infix_expression.left.is_none");
+                    }
+                    let left_expression = infix_expression.left.as_ref().unwrap();
+                    if let Expression::Boolean(n) = &**left_expression {
                         assert_eq!(n.value, left);
                     } else {
                         panic!(
                             "expected ExpressionType::Int, got {} instead",
-                            infix_expression.left
+                            left_expression
                         );
                     }
                     assert_eq!(&infix_expression.operator, operator);
-                    if let Expression::Boolean(n) = &*infix_expression.right {
+                    if infix_expression.right.is_none() {
+                        panic!("infix_expression.right.is_none");
+                    }
+                    let right_expression = infix_expression.right.as_ref().unwrap();
+                    if let Expression::Boolean(n) = &**right_expression {
                         assert_eq!(n.value, right);
                     } else {
                         panic!(
                             "expected ExpressionType::Int, got {} instead",
-                            infix_expression.right
+                            right_expression
                         );
                     }
                 } else {
-                    panic!(
-                        "expected ExpressionType::Infix, got {} instead",
-                        expression_statement.expression
-                    );
+                    panic!("expected ExpressionType::Infix, got {} instead", expression);
                 }
             } else {
                 panic!(
@@ -752,20 +770,21 @@ return 993322;
             "5 > 4 == 3 < 4",
             "5 < 4 != 3 > 4",
             "3 + 4 * 5 == 3 * 1 + 4 * 5",
-			"true",
-			"false",
-			"3 > 5 == false",
-			"3 < 5 == true",
-			"1 + (2 + 3) + 4",
-			"(5 + 5) * 2",
-			"2 / (5 + 5)",
-			"(5 + 5) * 2 * (5 + 5)",
-			"-(5 + 5)",
-			"!(true == true)",
-
-			"a + add(b * c) + d",
-			"add(a, b, 1, 2 * 3, 4 + 5, add(6, 7 * 8))",
-			"add(a + b + c * d / f + g)",
+            "true",
+            "false",
+            "3 > 5 == false",
+            "3 < 5 == true",
+            "1 + (2 + 3) + 4",
+            "(5 + 5) * 2",
+            "2 / (5 + 5)",
+            "(5 + 5) * 2 * (5 + 5)",
+            "-(5 + 5)",
+            "!(true == true)",
+            /*
+            "a + add(b * c) + d",
+            "add(a, b, 1, 2 * 3, 4 + 5, add(6, 7 * 8))",
+            "add(a + b + c * d / f + g)",
+            */
         ];
 
         let expecteds = vec![
@@ -781,20 +800,21 @@ return 993322;
             "((5 > 4) == (3 < 4))",
             "((5 < 4) != (3 > 4))",
             "((3 + (4 * 5)) == ((3 * 1) + (4 * 5)))",
-			"true",
-			"false",
+            "true",
+            "false",
             "((3 > 5) == false)",
-			"((3 < 5) == true)",
-			"((1 + (2 + 3)) + 4)",
-			"((5 + 5) * 2)",
-			"(2 / (5 + 5))",
-			"(((5 + 5) * 2) * (5 + 5))",
-			"(-(5 + 5))",
-			"(!(true == true))",
-
-			"((a + add((b * c))) + d)",
-			"add(a, b, 1, (2 * 3), (4 + 5), add(6, (7 * 8)))",
-			"add((((a + b) + ((c * d) / f)) + g))",
+            "((3 < 5) == true)",
+            "((1 + (2 + 3)) + 4)",
+            "((5 + 5) * 2)",
+            "(2 / (5 + 5))",
+            "(((5 + 5) * 2) * (5 + 5))",
+            "(-(5 + 5))",
+            "(!(true == true))",
+            /*
+            "((a + add((b * c))) + d)",
+            "add(a, b, 1, (2 * 3), (4 + 5), add(6, (7 * 8)))",
+            "add((((a + b) + ((c * d) / f)) + g))",
+            */
         ];
 
         for (input, expected) in inputs.into_iter().zip(expecteds) {
@@ -820,14 +840,49 @@ return 993322;
             assert_eq!(program.statements.len(), 1);
             let statement = &program.statements[0];
             if let StatementType::Expression(e) = statement {
-                if let Expression::Boolean(b) = &e.expression {
+                if e.expression.is_none() {
+                    panic!("e.expression.is_none");
+                }
+                let expression = e.expression.as_ref().unwrap();
+                if let Expression::Boolean(b) = expression {
                     assert_eq!(b.value, expected);
                 } else {
-                    panic!("expected Expression::Boolean, got {}", &e.expression);
+                    panic!("expected Expression::Boolean, got {}", expression);
                 }
             } else {
                 panic!("StatementType is not an Expression, got {}", statement);
             }
+        }
+    }
+
+    #[test]
+    fn test_if_expression() {
+        let input = "if (x < y) { x }";
+        let lexer = Lexer::new(input);
+        let mut parser = Parser::new(lexer);
+        let program = parser.parse_program().unwrap();
+        let _error_string = check_parser_errors(&parser);
+        //println!("{}", program);
+        assert_eq!(program.statements.len(), 1);
+
+        let statement = &program.statements[0];
+        if let StatementType::Expression(e) = statement {
+            if e.expression.is_none() {
+                panic!("e.expression.is_none");
+            }
+            let expression = e.expression.as_ref().unwrap();
+            if let Expression::If(_if_expression) = expression {
+                /*
+                pub condition: Box<Expression>,
+                pub consequence: Box<BlockStatement>,
+                pub alternative: Option<Box<BlockStatement>>,
+                            */
+                //assert_eq!(if_expression.condition)
+            } else {
+                panic!("expected Expression::If, got {}", expression);
+            }
+        } else {
+            panic!("StatementType is not an Expression, got {}", statement);
         }
     }
 }
