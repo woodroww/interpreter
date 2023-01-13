@@ -10,27 +10,6 @@ use crate::{
     token::{Token, TokenType},
 };
 
-/* not yet
-    p.registerPrefix(token.TRUE, p.parseBoolean)
-    p.registerPrefix(token.FALSE, p.parseBoolean)
-    p.registerPrefix(token.LPAREN, p.parseGroupedExpression)
-    p.registerPrefix(token., p.)
-
-// not yet
-    p.registerInfix(token.LPAREN, p.parseCallExpression)
-*/
-
-/*
-identifiers as arguments in a function call
-add(foobar, barfoo);
-identifiers as operands in an infix expression
-foobar + barfoo;
-identifier as a standalone expression as part of a conditional
-if (foobar) {
-
-just like any other expression, identifiers produce a value, the value they are bound to
-*/
-
 #[derive(Clone, Copy)]
 pub enum Precedence {
     Lowest,
@@ -135,6 +114,18 @@ fn parse_if_expression(parser: &mut Parser) -> Option<Expression> {
         Some(expression) => Some(Box::new(expression)),
         None => None,
     };
+
+    if parser.peek_token_is(&TokenType::Else) {
+        parser.next_token();
+        if !parser.expect_peek(&TokenType::Lbrace) {
+            return None;
+        }
+        expression.alternative = match parser.parse_block_statement() {
+            Some(expresssion) => Some(Box::new(expresssion)),
+            None => None,
+        };
+    }
+
     Some(Expression::If(expression))
 }
 
@@ -754,7 +745,7 @@ return 993322;
             let operator = match data[i].operator.as_str() {
                 "==" => Token::new(TokenType::Equal, "=="),
                 "!=" => Token::new(TokenType::NotEqual, "!="),
-                _ => unreachable!()
+                _ => unreachable!(),
             };
             let right_token = if data[i].right_value {
                 Token::new(TokenType::True, "true")
@@ -773,12 +764,11 @@ return 993322;
             let statement = &program.statements[0];
 
             let expected = StatementType::Expression(
-                ExpressionStatement::new(left_token.clone())
-                    .with_expression(Expression::Infix(
-                        InfixExpression::new(operator)
-                            .with_left(Expression::Boolean(BooleanExpression::new(left_token)))
-                            .with_right(Expression::Boolean(BooleanExpression::new(right_token))),
-                    ))
+                ExpressionStatement::new(left_token.clone()).with_expression(Expression::Infix(
+                    InfixExpression::new(operator)
+                        .with_left(Expression::Boolean(BooleanExpression::new(left_token)))
+                        .with_right(Expression::Boolean(BooleanExpression::new(right_token))),
+                )),
             );
 
             assert_eq!(*statement, expected);
@@ -900,23 +890,31 @@ return 993322;
         let statement = &program.statements[0];
 
         let expected = StatementType::Expression(
-            ExpressionStatement::new(Token::new(TokenType::If, "if"))
-                .with_expression(
-                    Expression::If(IfExpression::new(Token::new(TokenType::If, "if"))
+            ExpressionStatement::new(Token::new(TokenType::If, "if")).with_expression(
+                Expression::If(
+                    IfExpression::new(Token::new(TokenType::If, "if"))
                         .with_condition(Expression::Infix(
                             InfixExpression::new(Token::new(TokenType::LessThan, "<"))
-                                .with_left(Expression::Identifier(Identifier::new(Token::new(TokenType::Ident, "x"))))
-                                .with_right(Expression::Identifier(Identifier::new(Token::new(TokenType::Ident, "y"))))
-                        )
-                    ).with_consequence(BlockStatement::new(Token::new(TokenType::Lbrace, "{")).with_statements(vec![
-                        StatementType::Expression(
-                            ExpressionStatement::new(Token::new(TokenType::Ident, "x")).with_expression(
-                                Expression::Identifier(Identifier::new(Token::new(TokenType::Ident, "x")))
-                            )
-                        )
-                    ]))
-                )
-            )
+                                .with_left(Expression::Identifier(Identifier::new(Token::new(
+                                    TokenType::Ident,
+                                    "x",
+                                ))))
+                                .with_right(Expression::Identifier(Identifier::new(Token::new(
+                                    TokenType::Ident,
+                                    "y",
+                                )))),
+                        ))
+                        .with_consequence(
+                            BlockStatement::new(Token::new(TokenType::Lbrace, "{"))
+                                .with_statements(vec![StatementType::Expression(
+                                    ExpressionStatement::new(Token::new(TokenType::Ident, "x"))
+                                        .with_expression(Expression::Identifier(Identifier::new(
+                                            Token::new(TokenType::Ident, "x"),
+                                        ))),
+                                )]),
+                        ),
+                ),
+            ),
         );
 
         assert_eq!(*statement, expected);
@@ -933,5 +931,51 @@ return 993322;
             println!("{}", error_string.unwrap());
         }
         assert_eq!(program.statements.len(), 1);
+        let statement = &program.statements[0];
+
+        let expected = StatementType::Expression(
+            ExpressionStatement::new(Token::new(TokenType::If, "if")).with_expression(
+                Expression::If(
+                    IfExpression::new(Token::new(TokenType::If, "if"))
+                        .with_condition(Expression::Infix(
+                            InfixExpression::new(Token::new(TokenType::LessThan, "<"))
+                                .with_left(Expression::Identifier(Identifier::new(Token::new(
+                                    TokenType::Ident,
+                                    "x",
+                                ))))
+                                .with_right(Expression::Identifier(Identifier::new(Token::new(
+                                    TokenType::Ident,
+                                    "y",
+                                )))),
+                        ))
+                        .with_consequence(
+                            BlockStatement::new(Token::new(TokenType::Lbrace, "{"))
+                                .with_statements(vec![StatementType::Expression(
+                                    ExpressionStatement::new(Token::new(TokenType::Ident, "jam"))
+                                        .with_expression(Expression::Identifier(Identifier::new(
+                                            Token::new(TokenType::Ident, "jam"),
+                                        ))),
+                                )]),
+                        )
+                        .with_alternative(
+                            BlockStatement::new(Token::new(TokenType::Lbrace, "{"))
+                                .with_statements(vec![StatementType::Expression(
+                                    ExpressionStatement::new(Token::new(
+                                        TokenType::Ident,
+                                        "butter",
+                                    ))
+                                    .with_expression(
+                                        Expression::Identifier(Identifier::new(Token::new(
+                                            TokenType::Ident,
+                                            "butter",
+                                        ))),
+                                    ),
+                                )]),
+                        ),
+                ),
+            ),
+        );
+
+        assert_eq!(*statement, expected);
     }
 }

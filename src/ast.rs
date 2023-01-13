@@ -120,6 +120,10 @@ impl IfExpression {
         self.consequence = Some(Box::new(block));
         self
     }
+    pub fn with_alternative(mut self, block: BlockStatement) -> Self {
+        self.alternative = Some(Box::new(block));
+        self
+    }
 }
 
 impl NodeInterface for IfExpression {
