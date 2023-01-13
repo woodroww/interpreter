@@ -2,9 +2,9 @@ use std::collections::HashMap;
 
 use crate::{
     ast::{
-        BlockStatement, BooleanExpression, Expression, ExpressionStatement, FunctionLiteral,
+        BlockStatement, BooleanExpression, Expression, ExpressionStatement, FunctionLiteralExpression,
         Identifier, IfExpression, InfixExpression, LetStatement, PrefixExpression, Program,
-        ReturnStatement, StatementType,
+        ReturnStatement, StatementType, CallExpression,
     },
     lexer::Lexer,
     token::{Token, TokenType},
@@ -79,6 +79,15 @@ fn parse_infix_expression(parser: &mut Parser, left: Expression) -> Option<Expre
     Some(Expression::Infix(expression))
 }
 
+fn parse_call_expression(parser: &mut Parser, left: Expression) -> Option<Expression> {
+    let mut expression = CallExpression::new(parser.current_clone()).with_function(left);
+    let args = parser.parse_call_arguments();
+    if args.is_some() {
+        expression.arguments = args.unwrap();
+    }
+    Some(Expression::Call(expression))
+}
+
 fn parse_grouped_expression(parser: &mut Parser) -> Option<Expression> {
     parser.next_token();
     let expression = parser.parse_expression(Precedence::Lowest);
@@ -130,7 +139,7 @@ fn parse_if_expression(parser: &mut Parser) -> Option<Expression> {
 }
 
 fn parse_fn_literal(parser: &mut Parser) -> Option<Expression> {
-    let mut literal = FunctionLiteral::new(parser.current_clone());
+    let mut literal = FunctionLiteralExpression::new(parser.current_clone());
 
     if !parser.expect_peek(&TokenType::Lparen) {
         return None;
@@ -161,6 +170,7 @@ impl<'a> Parser<'a> {
             (TokenType::Minus, Precedence::Sum),
             (TokenType::Slash, Precedence::Product),
             (TokenType::Asterisk, Precedence::Product),
+            (TokenType::Lparen, Precedence::Call),
         ]);
         let mut parser = Self {
             lexer,
@@ -192,6 +202,7 @@ impl<'a> Parser<'a> {
         parser.register_infix(TokenType::NotEqual, parse_infix_expression);
         parser.register_infix(TokenType::LessThan, parse_infix_expression);
         parser.register_infix(TokenType::GreaterThan, parse_infix_expression);
+        parser.register_infix(TokenType::Lparen, parse_call_expression);
 
         parser
     }
@@ -406,6 +417,34 @@ impl<'a> Parser<'a> {
 
         Some(identifiers)
     }
+
+    fn parse_call_arguments(&mut self) -> Option<Vec<Expression>> {
+        let mut args = Vec::new();
+
+        if self.peek_token_is(&TokenType::Rparen) {
+            self.next_token();
+            return Some(args);
+        }
+        self.next_token();
+        let expression = self.parse_expression(Precedence::Lowest);
+        if expression.is_some() {
+            args.push(expression.unwrap());
+        }
+        while self.peek_token_is(&TokenType::Comma) {
+            self.next_token();
+            self.next_token();
+            let expression = self.parse_expression(Precedence::Lowest);
+            if expression.is_some() {
+                args.push(expression.unwrap());
+            }
+        }
+        if !self.expect_peek(&TokenType::Rparen) {
+            return None;
+        }
+
+        Some(args)
+    }
+
 
     fn peek_token_is(&self, token: &TokenType) -> bool {
         if self.peek_token.is_none() {
@@ -847,11 +886,9 @@ return 993322;
             "(5 + 5) * 2 * (5 + 5)",
             "-(5 + 5)",
             "!(true == true)",
-            /*
             "a + add(b * c) + d",
             "add(a, b, 1, 2 * 3, 4 + 5, add(6, 7 * 8))",
             "add(a + b + c * d / f + g)",
-            */
         ];
 
         let expecteds = vec![
@@ -877,11 +914,9 @@ return 993322;
             "(((5 + 5) * 2) * (5 + 5))",
             "(-(5 + 5))",
             "(!(true == true))",
-            /*
             "((a + add((b * c))) + d)",
             "add(a, b, 1, (2 * 3), (4 + 5), add(6, (7 * 8)))",
             "add((((a + b) + ((c * d) / f)) + g))",
-            */
         ];
 
         for (input, expected) in inputs.into_iter().zip(expecteds) {
@@ -1042,7 +1077,7 @@ return 993322;
         let expected = StatementType::Expression(
             ExpressionStatement::new(Token::new(TokenType::Function, "fn")).with_expression(
                 Expression::FunctionLiteral(
-                    FunctionLiteral::new(Token::new(TokenType::Function, "fn"))
+                    FunctionLiteralExpression::new(Token::new(TokenType::Function, "fn"))
                         .with_parameters(vec![
                             Identifier::new(Token::new(TokenType::Ident, "x")),
                             Identifier::new(Token::new(TokenType::Ident, "y")),
@@ -1096,7 +1131,7 @@ return 993322;
             let expected = StatementType::Expression(
                 ExpressionStatement::new(Token::new(TokenType::Function, "fn"))
                     .with_expression(Expression::FunctionLiteral(
-                        FunctionLiteral::new(Token::new(TokenType::Function, "fn"))
+                        FunctionLiteralExpression::new(Token::new(TokenType::Function, "fn"))
                             .with_parameters(expected_parameters)
                             .with_body(BlockStatement::new(Token::new(TokenType::Lbrace, "{")))
                     )),
@@ -1106,4 +1141,42 @@ return 993322;
             assert_eq!(*statement, expected);
         }
     }
+
+    #[test]
+    fn test_call_expression_parsing() {
+        let input = "add(1, 2 * 3, 4 + 5);";
+        let lexer = Lexer::new(input);
+        let mut parser = Parser::new(lexer);
+        let program = parser.parse_program().unwrap();
+        let error_string = check_parser_errors(&parser);
+        if error_string.is_some() {
+            println!("{}", error_string.unwrap());
+        }
+        assert_eq!(program.statements.len(), 1);
+
+        let statement = &program.statements[0];
+        let expected = StatementType::Expression(ExpressionStatement::new(Token::new(TokenType::Ident, "add"))
+            .with_expression(Expression::Call(CallExpression::new(Token::new(TokenType::Lparen, "(")).with_function(
+                Expression::Identifier(Identifier::new(Token::new(TokenType::Ident, "add")))
+            ).with_arguments(
+                    vec![
+                        Expression::Int(1),
+                        Expression::Infix(
+                            InfixExpression::new(Token::new(TokenType::Asterisk, "*"))
+                                .with_left(Expression::Int(2))
+                                .with_right(Expression::Int(3))
+                        ),
+                        Expression::Infix(
+                            InfixExpression::new(Token::new(TokenType::Plus, "+"))
+                                .with_left(Expression::Int(4))
+                                .with_right(Expression::Int(5))
+                        ),
+                    ]
+                ))
+            )
+        );
+
+        assert_eq!(*statement, expected);
+    }
+
 }

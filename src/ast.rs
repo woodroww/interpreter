@@ -167,7 +167,8 @@ pub enum Expression {
     Assign,
     Boolean(BooleanExpression),
     If(IfExpression),
-    FunctionLiteral(FunctionLiteral),
+    FunctionLiteral(FunctionLiteralExpression),
+    Call(CallExpression),
 }
 
 impl std::fmt::Display for Expression {
@@ -183,6 +184,7 @@ impl std::fmt::Display for Expression {
             Expression::Boolean(b) => write!(f, "{}", b.value),
             Expression::If(_) => todo!(),
             Expression::FunctionLiteral(_) => todo!(),
+            Expression::Call(c) => write!(f, "{}", c),
         }
     }
 }
@@ -277,6 +279,56 @@ impl std::fmt::Display for InfixExpression {
         write!(f, " {}", right)?;
         write!(f, ")")
         //write!(f, "")
+    }
+}
+
+// -----------------------------------------------------------------------------
+//  CallExpression
+// -----------------------------------------------------------------------------
+
+#[derive(Debug, Eq, PartialEq)]
+pub struct CallExpression {
+    pub token: Token,
+    pub function: Option<Box<Expression>>,
+    pub arguments: Vec<Expression>,
+}
+
+impl CallExpression {
+    pub fn new(token: Token) -> Self {
+        Self {
+            token,
+            function: None,
+            arguments: Vec::new(),
+        }
+    }
+    pub fn with_function(mut self, expression: Expression) -> Self {
+        self.function = Some(Box::new(expression));
+        self
+    }
+
+    pub fn with_arguments(mut self, arguments: Vec<Expression>) -> Self {
+        self.arguments = arguments;
+        self
+    }
+}
+
+impl std::fmt::Display for CallExpression {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match &self.function {
+            Some(function) => write!(f, "{}", function)?,
+            None => write!(f, "")?,
+        };
+        //write!(f, "{}", self.function)?;
+        write!(f, "(")?;
+        for (i, argument) in self.arguments.iter().enumerate() {
+            if i == self.arguments.len() - 1 {
+                write!(f, "{}", argument)?;
+            } else {
+                write!(f, "{}, ", argument)?;
+            }
+        }
+        write!(f, ")")?;
+        Ok(())
     }
 }
 
@@ -482,13 +534,13 @@ impl NodeInterface for ExpressionStatement {
 // -----------------------------------------------------------------------------
 
 #[derive(Debug, Eq, PartialEq)]
-pub struct FunctionLiteral {
+pub struct FunctionLiteralExpression {
     pub token: Token,
     pub parameters: Vec<Identifier>,
     pub body: Option<BlockStatement>,
 }
 
-impl FunctionLiteral {
+impl FunctionLiteralExpression {
     pub fn new(token: Token) -> Self {
         Self {
             token,
