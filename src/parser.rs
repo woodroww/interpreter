@@ -354,14 +354,16 @@ impl<'a> Parser<'a> {
         if self.current_token.is_none() {
             return None;
         }
-        let mut token = self.current_clone();
-        token.literal = "return".to_string();
-        //println!("so we have a parse_return_statement\nwith a token {}", token);
-        let statement = ReturnStatement::new(token);
+        let mut statement = ReturnStatement::new(self.current_clone());
+
         self.next_token();
-        while !self.current_token_is(&TokenType::Semicolon) {
+
+        statement.return_value = self.parse_expression(Precedence::Lowest);
+
+        if self.peek_token_is(&TokenType::Semicolon) {
             self.next_token();
         }
+
         Some(statement)
     }
 
@@ -372,7 +374,6 @@ impl<'a> Parser<'a> {
         let mut statement = LetStatement::new(self.current_clone());
 
         if !self.expect_peek(&TokenType::Ident) {
-            println!("ERROR: found let keyword but next token is not Ident");
             return None;
         }
 
@@ -383,12 +384,18 @@ impl<'a> Parser<'a> {
             if !self.expect_peek(&TokenType::Assign) {
                 return None;
             }
-            while !self.current_token_is(&TokenType::Semicolon) {
+
+            self.next_token();
+
+            statement.value = self.parse_expression(Precedence::Lowest);
+
+            if self.peek_token_is(&TokenType::Semicolon) {
                 self.next_token();
             }
-            return Some(statement);
+            Some(statement)
+        } else {
+            None
         }
-        None
     }
 
     fn parse_function_parameters(&mut self) -> Option<Vec<Identifier>> {
@@ -492,12 +499,6 @@ mod test {
     use crate::ast::NodeInterface;
     use pretty_assertions::assert_eq;
 
-    fn test_let_statement(s: &LetStatement, name: &str) {
-        assert_eq!(s.token_literal(), "let");
-        //assert_eq!(s.name.as_ref().unwrap().value, name);
-        assert_eq!(s.name.as_ref().unwrap().token_literal(), name)
-    }
-
     fn check_parser_errors(parser: &Parser) -> Option<String> {
         let errors = parser.errors();
         if errors.len() == 0 {
@@ -542,43 +543,6 @@ mod test {
     // page 80
     //fn test_literal_expression(expresssion: &Expression, expected: &Expression) {
     // use assert_eq!(expression, expected);
-    /*
-    match token_type {
-        TokenType::Equal => Expression::Boolean(())
-        TokenType::NotEqual => todo!(),
-
-    }
-        TokenType::LessThan => todo!(),
-        TokenType::GreaterThan => todo!(),
-
-        TokenType::Int => todo!(),
-        TokenType::Ident => todo!(),
-        TokenType::Assign => todo!(),
-        TokenType::Plus => todo!(),
-        TokenType::Minus => todo!(),
-        TokenType::Asterisk => todo!(),
-        TokenType::Slash => todo!(),
-
-
-        TokenType::Comma => todo!(),
-        TokenType::Semicolon => todo!(),
-        TokenType::Lparen => todo!(),
-        TokenType::Rparen => todo!(),
-        TokenType::Lbrace => todo!(),
-        TokenType::Rbrace => todo!(),
-        TokenType::Function => todo!(),
-        TokenType::Let => todo!(),
-
-        TokenType::True => todo!(),
-        TokenType::False => todo!(),
-
-        TokenType::If => todo!(),
-        TokenType::Else => todo!(),
-        TokenType::Return => todo!(),
-
-        TokenType::Illegal => todo!(),
-        TokenType::Bang => todo!(),
-    }*/
 
     fn test_infix_expression(statement: &StatementType, left: usize, operator: &str, right: usize) {
         if let StatementType::Expression(expression_statement) = &statement {
@@ -603,6 +567,71 @@ mod test {
     }
 
     #[test]
+    fn test_let_statement_1() {
+        let input = "let x = 5;";
+        let ident = "x";
+        let value = 5;
+        let lexer = Lexer::new(input);
+        let mut parser = Parser::new(lexer);
+        let program = parser.parse_program().unwrap();
+        let error_string = check_parser_errors(&parser);
+        if let Some(err) = error_string {
+            println!("{}", err);
+        }
+        println!("{}", program);
+        assert_eq!(program.statements.len(), 1);
+
+        let expected = StatementType::Let(
+            LetStatement::new(Token::new(TokenType::Let, "let"))
+                .with_value(Expression::Int(value))
+                .with_name(Identifier::new(Token::new(TokenType::Ident, ident)))
+        );
+        assert_eq!(program.statements[0], expected);
+    }
+
+    #[test]
+    fn test_let_statement_2() {
+        let input = "let y = true;";
+        let lexer = Lexer::new(input);
+        let mut parser = Parser::new(lexer);
+        let program = parser.parse_program().unwrap();
+        let error_string = check_parser_errors(&parser);
+        if let Some(err) = error_string {
+            println!("{}", err);
+        }
+        println!("{}", program);
+        assert_eq!(program.statements.len(), 1);
+
+        let expected = StatementType::Let(
+            LetStatement::new(Token::new(TokenType::Let, "let"))
+                .with_name(Identifier::new(Token::new(TokenType::Ident, "y")))
+                .with_value(Expression::Boolean(BooleanExpression::new(Token::new(TokenType::True, "true"))))
+        );
+        assert_eq!(program.statements[0], expected);
+    }
+
+    #[test]
+    fn test_let_statement_3() {
+        let input = "let foobar = y;";
+        let lexer = Lexer::new(input);
+        let mut parser = Parser::new(lexer);
+        let program = parser.parse_program().unwrap();
+        let error_string = check_parser_errors(&parser);
+        if let Some(err) = error_string {
+            println!("{}", err);
+        }
+        println!("{}", program);
+        assert_eq!(program.statements.len(), 1);
+
+        let expected = StatementType::Let(
+            LetStatement::new(Token::new(TokenType::Let, "let"))
+                .with_name(Identifier::new(Token::new(TokenType::Ident, "foobar")))
+                .with_value(Expression::Identifier(Identifier::new(Token::new(TokenType::Ident, "y"))))
+        );
+        assert_eq!(program.statements[0], expected);
+    }
+
+    #[test]
     fn test_let_statements() {
         let input = "
 let x = 5;
@@ -618,15 +647,19 @@ let foobar = 838383;
         }
         println!("{}", program);
         assert_eq!(program.statements.len(), 3);
-        let expected = vec!["x", "y", "foobar"];
+        let expected_idents = vec!["x", "y", "foobar"];
+        let expected_values = vec![5, 10, 838383];
 
         // so this needs a test_let_statement helper function in this module
         // and there are more tests in the source code for the book
-        for (statement, expected) in program.statements.iter().zip(expected) {
-            if let StatementType::Let(s) = statement {
-                test_let_statement(s, expected);
+        for i in 0..program.statements.len() {
+            if let StatementType::Let(s) = &program.statements[i] {
+                assert_eq!(s.token_literal(), "let");
+                let expression = Expression::Int(expected_values[i]);
+                assert_eq!(*s.value.as_ref().unwrap(), expression);
+                assert_eq!(s.name.as_ref().unwrap().token_literal(), expected_idents[i]);
             } else {
-                panic!("expected StatementType::Let, got {} instead", statement);
+                panic!("expected StatementType::Let, got {} instead", program.statements[i]);
             }
         }
     }

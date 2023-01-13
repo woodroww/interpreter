@@ -427,6 +427,14 @@ impl LetStatement {
             value: None,
         }
     }
+    pub fn with_value(mut self, expression: Expression) -> Self {
+        self.value = Some(expression);
+        self
+    }
+    pub fn with_name(mut self, name: Identifier) -> Self {
+        self.name = Some(name);
+        self
+    }
 }
 
 impl StatementInterface for LetStatement {
@@ -448,14 +456,18 @@ impl NodeInterface for LetStatement {
 #[derive(Debug, Eq, PartialEq)]
 pub struct ReturnStatement {
     pub token: Token,
-    pub return_value: Expression,
+    pub return_value: Option<Expression>,
 }
 
 impl std::fmt::Display for ReturnStatement {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "ReturnStatement:")?;
         write!(f, "{} ", self.token_literal())?;
-        write!(f, "{}", self.return_value)?;
+        if self.return_value.is_some() {
+            write!(f, "{}", self.return_value.as_ref().unwrap())?;
+        } else {
+            write!(f, "idk return?")?;
+        }
         write!(f, ";")
     }
 }
@@ -476,7 +488,7 @@ impl ReturnStatement {
     pub fn new(token: Token) -> Self {
         Self {
             token,
-            return_value: Expression::Return,
+            return_value: Some(Expression::Return),
         }
     }
 }
