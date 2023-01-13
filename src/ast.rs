@@ -167,6 +167,7 @@ pub enum Expression {
     Assign,
     Boolean(BooleanExpression),
     If(IfExpression),
+    FunctionLiteral(FunctionLiteral),
 }
 
 impl std::fmt::Display for Expression {
@@ -181,6 +182,7 @@ impl std::fmt::Display for Expression {
             Expression::Assign => write!(f, "="),
             Expression::Boolean(b) => write!(f, "{}", b.value),
             Expression::If(_) => todo!(),
+            Expression::FunctionLiteral(_) => todo!(),
         }
     }
 }
@@ -474,6 +476,37 @@ impl NodeInterface for ExpressionStatement {
         self.token.literal.clone()
     }
 }
+
+// -----------------------------------------------------------------------------
+//  FunctionLiteral
+// -----------------------------------------------------------------------------
+
+#[derive(Debug, Eq, PartialEq)]
+pub struct FunctionLiteral {
+    pub token: Token,
+    pub parameters: Vec<Identifier>,
+    pub body: Option<BlockStatement>,
+}
+
+impl FunctionLiteral {
+    pub fn new(token: Token) -> Self {
+        Self {
+            token,
+            parameters: Vec::new(),
+            body: None,
+        }
+    }
+
+    pub fn with_parameters(mut self, parameters: Vec<Identifier>) -> Self {
+        self.parameters = parameters;
+        self
+    }
+    pub fn with_body(mut self, body: BlockStatement) -> Self {
+        self.body = Some(body);
+        self
+    }
+}
+
 
 #[cfg(test)]
 mod test {

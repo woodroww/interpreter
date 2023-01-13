@@ -2,9 +2,9 @@ use std::collections::HashMap;
 
 use crate::{
     ast::{
-        BlockStatement, BooleanExpression, Expression, ExpressionStatement, Identifier,
-        IfExpression, InfixExpression, LetStatement, PrefixExpression, Program, ReturnStatement,
-        StatementType,
+        BlockStatement, BooleanExpression, Expression, ExpressionStatement, FunctionLiteral,
+        Identifier, IfExpression, InfixExpression, LetStatement, PrefixExpression, Program,
+        ReturnStatement, StatementType,
     },
     lexer::Lexer,
     token::{Token, TokenType},
@@ -129,6 +129,27 @@ fn parse_if_expression(parser: &mut Parser) -> Option<Expression> {
     Some(Expression::If(expression))
 }
 
+fn parse_fn_literal(parser: &mut Parser) -> Option<Expression> {
+    let mut literal = FunctionLiteral::new(parser.current_clone());
+
+    if !parser.expect_peek(&TokenType::Lparen) {
+        return None;
+    }
+
+    let parameters = parser.parse_function_parameters();
+    if parameters.is_some() {
+        literal.parameters = parameters.unwrap();
+    }
+
+    if !parser.expect_peek(&TokenType::Lbrace) {
+        return None;
+    }
+
+    literal.body = parser.parse_block_statement();
+
+    Some(Expression::FunctionLiteral(literal))
+}
+
 impl<'a> Parser<'a> {
     fn new(lexer: Lexer<'a>) -> Self {
         let precedences = HashMap::from([
@@ -157,12 +178,11 @@ impl<'a> Parser<'a> {
         parser.register_prefix(TokenType::Int, parse_integer_literal);
         parser.register_prefix(TokenType::Bang, parse_prefix_expression);
         parser.register_prefix(TokenType::Minus, parse_prefix_expression);
-
         parser.register_prefix(TokenType::True, parse_boolean);
         parser.register_prefix(TokenType::False, parse_boolean);
         parser.register_prefix(TokenType::Lparen, parse_grouped_expression);
-
         parser.register_prefix(TokenType::If, parse_if_expression);
+        parser.register_prefix(TokenType::Function, parse_fn_literal);
 
         parser.register_infix(TokenType::Plus, parse_infix_expression);
         parser.register_infix(TokenType::Minus, parse_infix_expression);
@@ -358,6 +378,33 @@ impl<'a> Parser<'a> {
             return Some(statement);
         }
         None
+    }
+
+    fn parse_function_parameters(&mut self) -> Option<Vec<Identifier>> {
+        let mut identifiers: Vec<Identifier> = Vec::new();
+
+        if self.peek_token_is(&TokenType::Rparen) {
+            self.next_token();
+            return Some(identifiers);
+        }
+
+        self.next_token();
+
+        let ident = Identifier::new(self.current_clone());
+        identifiers.push(ident);
+
+        while self.peek_token_is(&TokenType::Comma) {
+            self.next_token();
+            self.next_token();
+            let ident = Identifier::new(self.current_clone());
+            identifiers.push(ident);
+        }
+
+        if !self.expect_peek(&TokenType::Rparen) {
+            return None;
+        }
+
+        Some(identifiers)
     }
 
     fn peek_token_is(&self, token: &TokenType) -> bool {
@@ -977,5 +1024,86 @@ return 993322;
         );
 
         assert_eq!(*statement, expected);
+    }
+
+    #[test]
+    fn test_function_literal_parsing() {
+        let input = "fn(x, y) { x + y }";
+        let lexer = Lexer::new(input);
+        let mut parser = Parser::new(lexer);
+        let program = parser.parse_program().unwrap();
+        let error_string = check_parser_errors(&parser);
+        if error_string.is_some() {
+            println!("{}", error_string.unwrap());
+        }
+        assert_eq!(program.statements.len(), 1);
+        let statement = &program.statements[0];
+
+        let expected = StatementType::Expression(
+            ExpressionStatement::new(Token::new(TokenType::Function, "fn")).with_expression(
+                Expression::FunctionLiteral(
+                    FunctionLiteral::new(Token::new(TokenType::Function, "fn"))
+                        .with_parameters(vec![
+                            Identifier::new(Token::new(TokenType::Ident, "x")),
+                            Identifier::new(Token::new(TokenType::Ident, "y")),
+                        ])
+                        .with_body(
+                            BlockStatement::new(Token::new(TokenType::Lbrace, "{"))
+                                .with_statements(vec![StatementType::Expression(
+                                    ExpressionStatement::new(Token::new(TokenType::Ident, "x"))
+                                        .with_expression(Expression::Infix(
+                                            InfixExpression::new(Token::new(TokenType::Plus, "+"))
+                                                .with_left(Expression::Identifier(Identifier::new(
+                                                    Token::new(TokenType::Ident, "x"),
+                                                )))
+                                                .with_right(Expression::Identifier(
+                                                    Identifier::new(Token::new(
+                                                        TokenType::Ident,
+                                                        "y",
+                                                    )),
+                                                )),
+                                        )),
+                                )]),
+                        ),
+                ),
+            ),
+        );
+
+        assert_eq!(*statement, expected);
+    }
+
+    #[test]
+    fn test_function_parameter_parsing() {
+        let tests = vec![
+            ("fn() {};", vec![]),
+            ("fn(x) {};", vec!["x"]),
+            ("fn(x, y, z) {};", vec!["x", "y", "z"]),
+        ];
+
+        for test in tests.into_iter() {
+            let lexer = Lexer::new(test.0);
+            let mut parser = Parser::new(lexer);
+            let program = parser.parse_program().unwrap();
+            let error_string = check_parser_errors(&parser);
+            if error_string.is_some() {
+                println!("{}", error_string.unwrap());
+            }
+            assert_eq!(program.statements.len(), 1);
+            let mut expected_parameters = Vec::new();
+            for parameter in test.1.iter() {
+                expected_parameters.push(Identifier::new(Token::new(TokenType::Ident, parameter)));
+            }
+            let expected = StatementType::Expression(
+                ExpressionStatement::new(Token::new(TokenType::Function, "fn"))
+                    .with_expression(Expression::FunctionLiteral(
+                        FunctionLiteral::new(Token::new(TokenType::Function, "fn"))
+                            .with_parameters(expected_parameters)
+                            .with_body(BlockStatement::new(Token::new(TokenType::Lbrace, "{")))
+                    )),
+            );
+
+            let statement = &program.statements[0];
+            assert_eq!(*statement, expected);
+        }
     }
 }
