@@ -21,7 +21,7 @@ pub enum Precedence {
     Call,        // myFunction(X)
 }
 
-struct Parser<'a> {
+pub struct Parser<'a> {
     lexer: Lexer<'a>,
     current_token: Option<Token>,
     peek_token: Option<Token>,
@@ -160,7 +160,7 @@ fn parse_fn_literal(parser: &mut Parser) -> Option<Expression> {
 }
 
 impl<'a> Parser<'a> {
-    fn new(lexer: Lexer<'a>) -> Self {
+    pub fn new(lexer: Lexer<'a>) -> Self {
         let precedences = HashMap::from([
             (TokenType::Equal, Precedence::Equals),
             (TokenType::NotEqual, Precedence::Equals),
@@ -207,7 +207,7 @@ impl<'a> Parser<'a> {
         parser
     }
 
-    fn parse_program(&mut self) -> Option<Program> {
+    pub fn parse_program(&mut self) -> Option<Program> {
         //println!("parse_program");
         let mut program: Program = Program::new();
         while let Some(_token) = &self.current_token {
@@ -341,7 +341,7 @@ impl<'a> Parser<'a> {
         self.infix_fns.insert(token, f);
     }
 
-    fn errors(&self) -> Vec<String> {
+    pub fn errors(&self) -> Vec<String> {
         self.errors.clone()
     }
 
