@@ -20,7 +20,7 @@ pub trait StatementInterface {
 //  Identifier
 // -----------------------------------------------------------------------------
 
-#[derive(Debug)]
+#[derive(Debug, Eq, PartialEq)]
 pub struct Identifier {
     pub token: Token,
 }
@@ -44,7 +44,7 @@ impl Identifier {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Eq, PartialEq)]
 pub struct BooleanExpression {
     pub token: Token,
     pub value: bool,
@@ -73,7 +73,7 @@ impl BooleanExpression {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Eq, PartialEq)]
 pub struct BlockStatement {
     pub token: Token,
     pub statements: Vec<StatementType>,
@@ -82,6 +82,10 @@ pub struct BlockStatement {
 impl BlockStatement {
     pub fn new(token: Token) -> Self {
         Self { token, statements: Vec::new() }
+    }
+    pub fn with_statements(mut self, statements: Vec<StatementType>) -> Self {
+        self.statements = statements;
+        self
     }
 }
 
@@ -95,7 +99,7 @@ impl std::fmt::Display for BlockStatement {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Eq, PartialEq)]
 pub struct IfExpression {
     pub token: Token,
     pub condition: Option<Box<Expression>>,
@@ -106,6 +110,15 @@ pub struct IfExpression {
 impl IfExpression {
     pub fn new(token: Token) -> Self {
         Self { token, condition: None, consequence: None, alternative: None }
+    }
+
+    pub fn with_condition(mut self, expression: Expression) -> Self {
+        self.condition = Some(Box::new(expression));
+        self
+    }
+    pub fn with_consequence(mut self, block: BlockStatement) -> Self {
+        self.consequence = Some(Box::new(block));
+        self
     }
 }
 
@@ -140,7 +153,7 @@ impl std::fmt::Display for IfExpression {
 //  Expression
 // -----------------------------------------------------------------------------
 
-#[derive(Debug)]
+#[derive(Debug, Eq, PartialEq)]
 pub enum Expression {
     Identifier(Identifier),
     Prefix(PrefixExpression),
@@ -168,20 +181,27 @@ impl std::fmt::Display for Expression {
     }
 }
 
-#[derive(Debug)]
+// -----------------------------------------------------------------------------
+//  PrefixExpression 
+// -----------------------------------------------------------------------------
+
+#[derive(Debug, Eq, PartialEq)]
 pub struct PrefixExpression {
     pub token: Token, // Bang or Minus at this point
-    pub operator: String,
+    //pub operator: String,
     pub right: Option<Box<Expression>>,
 }
 
 impl PrefixExpression {
-    pub fn new(token: Token, operator: &str) -> Self {
+    pub fn new(token: Token) -> Self {
         Self {
             token,
-            operator: operator.to_string(),
             right: None,
         }
+    }
+    pub fn with_right(mut self, expression: Expression) -> Self {
+        self.right = Some(Box::new(expression));
+        self
     }
 }
 
@@ -189,7 +209,7 @@ impl std::fmt::Display for PrefixExpression {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         //write!(f, "PrefixExpression:")?;
         write!(f, "(")?;
-        write!(f, "{}", self.operator)?;
+        write!(f, "{}", self.token.literal)?;
         let right = match &self.right {
             Some(r) => format!("{}", r),
             None => format!(""),
@@ -199,22 +219,38 @@ impl std::fmt::Display for PrefixExpression {
     }
 }
 
-#[derive(Debug)]
+// -----------------------------------------------------------------------------
+//  InfixExpression 
+// -----------------------------------------------------------------------------
+
+#[derive(Debug, Eq, PartialEq)]
 pub struct InfixExpression {
     pub token: Token,
     pub left: Option<Box<Expression>>,
-    pub operator: String,
+    //pub operator: String,
     pub right: Option<Box<Expression>>,
 }
 
 impl InfixExpression {
-    pub fn new(token: Token, operator: &str, left: Expression) -> Self {
+    pub fn new(token: Token) -> Self {
+        //assert_eq!(token.literal, operator);
         Self {
             token,
-            left: Some(Box::new(left)),
-            operator: operator.to_string(),
+            left: None,
             right: None,
         }
+    }
+    pub fn with_left(mut self, lhs: Expression) -> Self {
+        self.left = Some(Box::new(lhs));
+        self
+    }
+
+    pub fn with_right(mut self, rhs: Expression) -> Self {
+        self.right = Some(Box::new(rhs));
+        self
+    }
+    pub fn operator(&self) -> String {
+        self.token.literal.clone()
     }
 }
 
@@ -231,7 +267,7 @@ impl std::fmt::Display for InfixExpression {
             None => format!(""),
         };
         write!(f, "{}", left)?;
-        write!(f, " {}", self.operator)?;
+        write!(f, " {}", self.token.literal)?;
         write!(f, " {}", right)?;
         write!(f, ")")
         //write!(f, "")
@@ -245,7 +281,7 @@ impl std::fmt::Display for InfixExpression {
 // Monkey program is a series of statements. These statements are contained in the
 // Program.Statements, which is just a slice of AST nodes that implement the Statement interface.
 
-#[derive(Debug)]
+#[derive(Debug, Eq, PartialEq)]
 pub enum StatementType {
     Let(LetStatement),
     Return(ReturnStatement),
@@ -300,7 +336,7 @@ impl Program {
 //  LetStatement
 // -----------------------------------------------------------------------------
 
-#[derive(Debug)]
+#[derive(Debug, Eq, PartialEq)]
 pub struct LetStatement {
     pub token: Token,
     pub name: Option<Identifier>,
@@ -351,7 +387,7 @@ impl NodeInterface for LetStatement {
 //  ReturnStatement
 // -----------------------------------------------------------------------------
 
-#[derive(Debug)]
+#[derive(Debug, Eq, PartialEq)]
 pub struct ReturnStatement {
     pub token: Token,
     pub return_value: Expression,
@@ -393,10 +429,23 @@ impl ReturnStatement {
 // basically a wrapper for an expression, like when you type `1 + 1` in the
 // python REPL and you get 2, no let, no return
 
-#[derive(Debug)]
+#[derive(Debug, Eq, PartialEq)]
 pub struct ExpressionStatement {
     pub token: Token,
     pub expression: Option<Expression>,
+}
+
+impl ExpressionStatement {
+    pub fn new(token: Token) -> Self {
+        Self {
+            token,
+            expression: None,
+        }
+    }
+    pub fn with_expression(mut self, expression: Expression) -> Self {
+        self.expression = Some(expression);
+        self
+    }
 }
 
 impl std::fmt::Display for ExpressionStatement {
@@ -419,15 +468,6 @@ impl StatementInterface for ExpressionStatement {
 impl NodeInterface for ExpressionStatement {
     fn token_literal(&self) -> String {
         self.token.literal.clone()
-    }
-}
-
-impl ExpressionStatement {
-    pub fn new(token: Token) -> Self {
-        Self {
-            token,
-            expression: None,
-        }
     }
 }
 

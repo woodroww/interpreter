@@ -1,5 +1,5 @@
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Eq, PartialEq)]
 pub struct Token {
     pub token_type: TokenType,
     pub literal: String,
@@ -17,7 +17,7 @@ impl std::fmt::Display for Token {
     }
 }
 
-#[derive(Hash, Clone, Debug, Eq, PartialEq)]
+#[derive(Copy, Hash, Clone, Debug, Eq, PartialEq)]
 pub enum TokenType {
     Illegal,
 
@@ -64,6 +64,37 @@ impl std::fmt::Display for TokenType {
 }
 
 impl TokenType {
+
+    pub fn type_from_str(input: &str) -> Option<TokenType> {
+        Some(match input {
+            "illegal" => TokenType::Illegal,
+            "=" => TokenType::Assign,
+            "+" => TokenType::Plus,
+            "-" => TokenType::Minus,
+            "/" => TokenType::Slash,
+            "*" => TokenType::Asterisk,
+            "==" => TokenType::Equal,
+            "!" => TokenType::Bang,
+            "!=" => TokenType::NotEqual,
+            "<" => TokenType::LessThan,
+            ">" => TokenType::GreaterThan,
+            "," => TokenType::Comma,
+            ";" => TokenType::Semicolon,
+            "(" => TokenType::Lparen,
+            ")" => TokenType::Rparen,
+            "{" => TokenType::Lbrace,
+            "}" => TokenType::Rbrace,
+            "function" => TokenType::Function,
+            "let" => TokenType::Let,
+            "true" => TokenType::True,
+            "false" => TokenType::False,
+            "if" => TokenType::If,
+            "else" => TokenType::Else,
+            "return" => TokenType::Return,
+            _ => TokenType::Illegal,
+        })
+    }
+
     pub fn literal(&self) -> String {
         match self {
             TokenType::Illegal => "illegal".to_string(),
