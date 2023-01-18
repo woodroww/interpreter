@@ -1,6 +1,7 @@
 use std::io;
-use std::io::{Write, Read};
-use interpreter::{lexer::Lexer, token::Token, parser::Parser};
+use std::io::Write;
+use interpreter::{lexer::Lexer, parser::Parser};
+use interpreter::evaluator::*;
 
 const PROMPT: &'static str = ">> ";
 const MONKEY_FACE: &'static str = r#"            __,__
@@ -46,7 +47,13 @@ fn start() -> io::Result<()> {
             continue;
         }
 
-        println!("{}", program);
+        let mut evaluator = Evaluator;
+        let evaluated = evaluator.eval_statements(&program.statements);
+        if evaluated.is_some() {
+            println!("{}", evaluated.unwrap());
+        }
+
+        //println!("{}", program);
     }
 }
 
