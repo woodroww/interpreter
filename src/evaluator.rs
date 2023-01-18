@@ -17,6 +17,9 @@ impl Evaluator {
                     .as_ref()
                     .expect("will have to deal with this later"),
             ),
+            StatementType::Block(block_statement) => {
+                self.eval_statements(&block_statement.statements)
+            }
         }
     }
 
@@ -47,38 +50,29 @@ impl Evaluator {
                     .expect("will have to deal with this later");
                 self.eval_infix_expression(infix.token.token_type, left, right)
             }
+            Expression::If(if_expression) => {
+                let condition = self.eval_expression(&*if_expression.condition.as_ref().expect("do we have to have a condition?"));
+                if is_truthy(condition.expect("idk")) {
+                    if let Some(consequence) = &if_expression.consequence {
+                        self.eval_statement(&StatementType::Block(*consequence.clone()))
+                    } else {
+                        Some(Object::Null)
+                    }
+                } else if let Some(alternative) = &if_expression.alternative {
+                    self.eval_statement(&StatementType::Block(*alternative.clone()))
+                } else {
+                    Some(Object::Null)
+                }
+            }
             /*
             Expression::Identifier(_) => None,
             Expression::Return => todo!(),
             Expression::Assign => todo!(),
-            Expression::If(_) => todo!(),
             Expression::FunctionLiteral(_) => todo!(),
             Expression::Call(_) => todo!(),*/
             _ => None,
         }
     }
-
-    /*
-func evalInfixExpression(
-	operator string,
-	left, right object.Object,
-) object.Object {
-	switch {
-	case left.Type() == object.INTEGER_OBJ && right.Type() == object.INTEGER_OBJ:
-		return evalIntegerInfixExpression(operator, left, right)
-	case operator == "==":
-		return nativeBoolToBooleanObject(left == right)
-	case operator == "!=":
-		return nativeBoolToBooleanObject(left != right)
-	case left.Type() != right.Type():
-		return newError("type mismatch: %s %s %s",
-			left.Type(), operator, right.Type())
-	default:
-		return newError("unknown operator: %s %s %s",
-			left.Type(), operator, right.Type())
-	}
-}
-    */
 
     fn eval_infix_expression(
         &self,
@@ -151,6 +145,14 @@ func evalInfixExpression(
             result = self.eval_statement(statement);
         }
         result
+    }
+}
+
+fn is_truthy(object: Object) -> bool {
+    match object {
+        Object::Integer(_) => true,
+        Object::Boolean(b) => b,
+        Object::Null => false,
     }
 }
 
@@ -252,5 +254,39 @@ mod test {
             test_integer_object(evaluated.unwrap(), test.1);
         }
     }
+
+    #[test]
+    fn test_if_else_expressions() {
+        let tests = vec![
+            ("if (true) { 10 }", Some(10)),
+            ("if (false) { 10 }", None),
+            ("if (1) { 10 }", Some(10)),
+            ("if (1 < 2) { 10 }", Some(10)),
+            ("if (1 > 2) { 10 }", None),
+            ("if (1 > 2) { 10 } else { 20 }", Some(20)),
+            ("if (1 < 2) { 10 } else { 20 }", Some(10)),
+        ];
+
+        for test in tests {
+            let evaluated = test_eval(test.0);
+            match evaluated {
+                Some(obj) => {
+                    match test.1 {
+                        Some(n) => test_integer_object(obj, n),
+                        None => {
+                            assert_eq!(obj, Object::Null);
+                            println!("got evaluated to Object::Null");
+                        }
+                    }
+                }
+                None => {
+                    unreachable!();
+                    //assert_eq!(None, test.1);
+                    //println!("got evaluated to None");
+                }
+            };
+        }
+    }
+
 
 }

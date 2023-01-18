@@ -20,7 +20,7 @@ pub trait StatementInterface {
 //  Identifier
 // -----------------------------------------------------------------------------
 
-#[derive(Debug, Eq, PartialEq)]
+#[derive(Debug, Eq, PartialEq, Clone)]
 pub struct Identifier {
     pub token: Token,
 }
@@ -44,7 +44,7 @@ impl Identifier {
     }
 }
 
-#[derive(Debug, Eq, PartialEq)]
+#[derive(Debug, Eq, PartialEq, Clone)]
 pub struct BooleanExpression {
     pub token: Token,
     pub value: bool,
@@ -73,7 +73,7 @@ impl BooleanExpression {
     }
 }
 
-#[derive(Debug, Eq, PartialEq)]
+#[derive(Debug, Eq, PartialEq, Clone)]
 pub struct BlockStatement {
     pub token: Token,
     pub statements: Vec<StatementType>,
@@ -99,7 +99,7 @@ impl std::fmt::Display for BlockStatement {
     }
 }
 
-#[derive(Debug, Eq, PartialEq)]
+#[derive(Debug, Eq, PartialEq, Clone)]
 pub struct IfExpression {
     pub token: Token,
     pub condition: Option<Box<Expression>>,
@@ -157,7 +157,7 @@ impl std::fmt::Display for IfExpression {
 //  Expression
 // -----------------------------------------------------------------------------
 
-#[derive(Debug, Eq, PartialEq)]
+#[derive(Debug, Eq, PartialEq, Clone)]
 pub enum Expression {
     Identifier(Identifier),
     Prefix(PrefixExpression),
@@ -193,7 +193,7 @@ impl std::fmt::Display for Expression {
 //  PrefixExpression 
 // -----------------------------------------------------------------------------
 
-#[derive(Debug, Eq, PartialEq)]
+#[derive(Debug, Eq, PartialEq, Clone)]
 pub struct PrefixExpression {
     pub token: Token, // Bang or Minus at this point
     //pub operator: String,
@@ -231,7 +231,7 @@ impl std::fmt::Display for PrefixExpression {
 //  InfixExpression 
 // -----------------------------------------------------------------------------
 
-#[derive(Debug, Eq, PartialEq)]
+#[derive(Debug, Eq, PartialEq, Clone)]
 pub struct InfixExpression {
     pub token: Token,
     pub left: Option<Box<Expression>>,
@@ -286,7 +286,7 @@ impl std::fmt::Display for InfixExpression {
 //  CallExpression
 // -----------------------------------------------------------------------------
 
-#[derive(Debug, Eq, PartialEq)]
+#[derive(Debug, Eq, PartialEq, Clone)]
 pub struct CallExpression {
     pub token: Token,
     pub function: Option<Box<Expression>>,
@@ -339,11 +339,12 @@ impl std::fmt::Display for CallExpression {
 // Monkey program is a series of statements. These statements are contained in the
 // Program.Statements, which is just a slice of AST nodes that implement the Statement interface.
 
-#[derive(Debug, Eq, PartialEq)]
+#[derive(Debug, Eq, PartialEq, Clone)]
 pub enum StatementType {
     Let(LetStatement),
     Return(ReturnStatement),
     Expression(ExpressionStatement),
+    Block(BlockStatement),
 }
 
 impl std::fmt::Display for StatementType {
@@ -353,6 +354,7 @@ impl std::fmt::Display for StatementType {
             StatementType::Let(s) => write!(f, "{}", s),
             StatementType::Return(s) => write!(f, "{}", s),
             StatementType::Expression(s) => write!(f, "{}", s),
+            StatementType::Block(_) => todo!(),
         }
     }
 }
@@ -394,7 +396,7 @@ impl Program {
 //  LetStatement
 // -----------------------------------------------------------------------------
 
-#[derive(Debug, Eq, PartialEq)]
+#[derive(Debug, Eq, PartialEq, Clone)]
 pub struct LetStatement {
     pub token: Token,
     pub name: Option<Identifier>,
@@ -453,7 +455,7 @@ impl NodeInterface for LetStatement {
 //  ReturnStatement
 // -----------------------------------------------------------------------------
 
-#[derive(Debug, Eq, PartialEq)]
+#[derive(Debug, Eq, PartialEq, Clone)]
 pub struct ReturnStatement {
     pub token: Token,
     pub return_value: Option<Expression>,
@@ -499,7 +501,7 @@ impl ReturnStatement {
 // basically a wrapper for an expression, like when you type `1 + 1` in the
 // python REPL and you get 2, no let, no return
 
-#[derive(Debug, Eq, PartialEq)]
+#[derive(Debug, Eq, PartialEq, Clone)]
 pub struct ExpressionStatement {
     pub token: Token,
     pub expression: Option<Expression>,
@@ -545,7 +547,7 @@ impl NodeInterface for ExpressionStatement {
 //  FunctionLiteral
 // -----------------------------------------------------------------------------
 
-#[derive(Debug, Eq, PartialEq)]
+#[derive(Debug, Eq, PartialEq, Clone)]
 pub struct FunctionLiteralExpression {
     pub token: Token,
     pub parameters: Vec<Identifier>,
