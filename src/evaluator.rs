@@ -58,24 +58,66 @@ impl Evaluator {
         }
     }
 
+    /*
+func evalInfixExpression(
+	operator string,
+	left, right object.Object,
+) object.Object {
+	switch {
+	case left.Type() == object.INTEGER_OBJ && right.Type() == object.INTEGER_OBJ:
+		return evalIntegerInfixExpression(operator, left, right)
+	case operator == "==":
+		return nativeBoolToBooleanObject(left == right)
+	case operator == "!=":
+		return nativeBoolToBooleanObject(left != right)
+	case left.Type() != right.Type():
+		return newError("type mismatch: %s %s %s",
+			left.Type(), operator, right.Type())
+	default:
+		return newError("unknown operator: %s %s %s",
+			left.Type(), operator, right.Type())
+	}
+}
+    */
+
     fn eval_infix_expression(
         &self,
-        token: TokenType,
+        operator: TokenType,
         left: Object,
         right: Object,
     ) -> Option<Object> {
-        match (left, right) {
-            (Object::Integer(a), Object::Integer(b)) => self.eval_integer_infix_expression(token, a, b),
-            (_, _) => None
+        match (&left, &right) {
+            (Object::Integer(a), Object::Integer(b)) => {
+                return self.eval_integer_infix_expression(operator, *a, *b);
+            }
+            (_, _) => {},
         }
+        match operator {
+            TokenType::Equal => return Some(Object::Boolean(left == right)),
+            TokenType::NotEqual => return Some(Object::Boolean(left != right)),
+            _ => {},
+        }
+        if std::mem::discriminant(&left) != std::mem::discriminant(&right) {
+            panic!("type mismatch: {} {} {}", left, operator, right);
+        }
+        panic!("unknown operator: {} {} {}", left, operator, right);
     }
 
-    fn eval_integer_infix_expression(&self, token: TokenType, left: isize, right: isize) -> Option<Object> {
+    fn eval_integer_infix_expression(
+        &self,
+        token: TokenType,
+        left: isize,
+        right: isize,
+    ) -> Option<Object> {
         match token {
             TokenType::Plus => Some(Object::Integer(left + right)),
             TokenType::Minus => Some(Object::Integer(left - right)),
             TokenType::Slash => Some(Object::Integer(left / right)),
             TokenType::Asterisk => Some(Object::Integer(left * right)),
+            TokenType::LessThan => Some(Object::Boolean(left < right)),
+            TokenType::GreaterThan => Some(Object::Boolean(left > right)),
+            TokenType::Equal => Some(Object::Boolean(left == right)),
+            TokenType::NotEqual => Some(Object::Boolean(left != right)),
             _ => None,
         }
     }
@@ -141,12 +183,31 @@ mod test {
 
     #[test]
     fn test_eval_boolean_expression() {
-        let inputs = vec!["true", "false"];
-        let expected = vec![true, false];
+        let tests = vec![
+            ("true", true),
+            ("false", false),
+            ("1 < 2", true),
+            ("1 > 2", false),
+            ("1 < 1", false),
+            ("1 > 1", false),
+            ("1 == 1", true),
+            ("1 != 1", false),
+            ("1 == 2", false),
+            ("1 != 2", true),
+            ("true == true", true),
+            ("false == false", true),
+            ("true == false", false),
+            ("true != false", true),
+            ("false != true", true),
+            ("(1 < 2) == true", true),
+            ("(1 < 2) == false", false),
+            ("(1 > 2) == true", false),
+            ("(1 > 2) == false", true),
+        ];
 
-        for (input, expected) in inputs.iter().zip(expected) {
+        for (input, expected) in tests.iter() {
             let evaluated = test_eval(input);
-            test_boolean_object(evaluated.unwrap(), expected);
+            test_boolean_object(evaluated.unwrap(), *expected);
         }
     }
 
@@ -191,4 +252,5 @@ mod test {
             test_integer_object(evaluated.unwrap(), test.1);
         }
     }
+
 }
