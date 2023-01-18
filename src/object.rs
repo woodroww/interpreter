@@ -1,6 +1,6 @@
 #[derive(Eq, PartialEq, Debug)]
 pub enum Object {
-    Integer(usize),
+    Integer(isize),
     Boolean(bool),
     Null,
 }

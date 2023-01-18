@@ -1,4 +1,8 @@
-use crate::{ast::{Expression, StatementType}, object::Object, token::TokenType};
+use crate::{
+    ast::{Expression, StatementType},
+    object::Object,
+    token::TokenType,
+};
 
 pub struct Evaluator;
 
@@ -7,9 +11,12 @@ impl Evaluator {
         match node {
             StatementType::Let(_) => todo!(),
             StatementType::Return(_) => todo!(),
-            StatementType::Expression(statement) => {
-                self.eval_expression(statement.expression.as_ref().expect("will have to deal with this later"))
-            }
+            StatementType::Expression(statement) => self.eval_expression(
+                statement
+                    .expression
+                    .as_ref()
+                    .expect("will have to deal with this later"),
+            ),
         }
     }
 
@@ -21,9 +28,27 @@ impl Evaluator {
                 let right = self.eval_expression(&prefix.right.as_ref().unwrap());
                 self.eval_prefix_expression(prefix.token.token_type, right.unwrap())
             }
+            Expression::Infix(infix) => {
+                let left = self
+                    .eval_expression(
+                        infix
+                            .left
+                            .as_ref()
+                            .expect("will have to deal with this later"),
+                    )
+                    .expect("will have to deal with this later");
+                let right = self
+                    .eval_expression(
+                        infix
+                            .right
+                            .as_ref()
+                            .expect("will have to deal with this later"),
+                    )
+                    .expect("will have to deal with this later");
+                self.eval_infix_expression(infix.token.token_type, left, right)
+            }
             /*
             Expression::Identifier(_) => None,
-            Expression::Infix(_) => todo!(),
             Expression::Return => todo!(),
             Expression::Assign => todo!(),
             Expression::If(_) => todo!(),
@@ -33,9 +58,32 @@ impl Evaluator {
         }
     }
 
+    fn eval_infix_expression(
+        &self,
+        token: TokenType,
+        left: Object,
+        right: Object,
+    ) -> Option<Object> {
+        match (left, right) {
+            (Object::Integer(a), Object::Integer(b)) => self.eval_integer_infix_expression(token, a, b),
+            (_, _) => None
+        }
+    }
+
+    fn eval_integer_infix_expression(&self, token: TokenType, left: isize, right: isize) -> Option<Object> {
+        match token {
+            TokenType::Plus => Some(Object::Integer(left + right)),
+            TokenType::Minus => Some(Object::Integer(left - right)),
+            TokenType::Slash => Some(Object::Integer(left / right)),
+            TokenType::Asterisk => Some(Object::Integer(left * right)),
+            _ => None,
+        }
+    }
+
     fn eval_prefix_expression(&self, token: TokenType, right: Object) -> Option<Object> {
         match token {
             TokenType::Bang => self.eval_bang_operator_expression(right),
+            TokenType::Minus => self.eval_minus_prefix_operator_expression(right),
             _ => None,
         }
     }
@@ -45,6 +93,13 @@ impl Evaluator {
             Object::Boolean(b) => Some(Object::Boolean(!b)),
             Object::Null => Some(Object::Boolean(true)),
             _ => Some(Object::Boolean(false)),
+        }
+    }
+
+    fn eval_minus_prefix_operator_expression(&self, right: Object) -> Option<Object> {
+        match right {
+            Object::Integer(n) => Some(Object::Integer(-n)),
+            _ => None,
         }
     }
 
@@ -64,29 +119,16 @@ mod test {
     use pretty_assertions::assert_eq;
 
     fn test_eval(input: &str) -> Option<Object> {
-        let lexer = Lexer::new(input);
-        let mut parser = Parser::new(lexer);
+        let mut parser = Parser::new(Lexer::new(input));
         let program = parser.parse_program();
         let mut evaluator = Evaluator;
-        let what = evaluator.eval_statements(&program.unwrap().statements);
-        what
+        evaluator.eval_statements(&program.unwrap().statements)
     }
 
-    fn test_integer_object(obj: Object, expected: usize) {
+    fn test_integer_object(obj: Object, expected: isize) {
         match obj {
             Object::Integer(n) => assert_eq!(n, expected),
             object => panic!("expected integer, got {}", object),
-        }
-    }
-
-    #[test]
-    fn test_eval_integer_expression() {
-        let inputs = vec!["5", "10"];
-        let expected = vec![5, 10];
-
-        for (input, expected) in inputs.iter().zip(expected) {
-            let evaluated = test_eval(input);
-            test_integer_object(evaluated.unwrap(), expected);
         }
     }
 
@@ -122,6 +164,31 @@ mod test {
         for test in tests {
             let evaluated = test_eval(test.0);
             test_boolean_object(evaluated.unwrap(), test.1);
+        }
+    }
+
+    #[test]
+    fn test_eval_integer_expression() {
+        let tests = vec![
+            ("5", 5),
+            ("10", 10),
+            ("-5", -5),
+            ("-10", -10),
+            ("5 + 5 + 5 + 5 - 10", 10),
+            ("2 * 2 * 2 * 2 * 2", 32),
+            ("-50 + 100 + -50", 0),
+            ("5 * 2 + 10", 20),
+            ("5 + 2 * 10", 25),
+            ("20 + 2 * -10", 0),
+            ("50 / 2 * 2 + 10", 60),
+            ("2 * (5 + 10)", 30),
+            ("3 * 3 * 3 + 10", 37),
+            ("3 * (3 * 3) + 10", 37),
+            ("(5 + 10 * 2 + 15 / 3) * 2 + -10", 50),
+        ];
+        for test in tests {
+            let evaluated = test_eval(test.0);
+            test_integer_object(evaluated.unwrap(), test.1);
         }
     }
 }

@@ -43,7 +43,7 @@ fn parse_identifier(parser: &mut Parser) -> Option<Expression> {
 fn parse_integer_literal(parser: &mut Parser) -> Option<Expression> {
     let token = parser.current_clone();
     if let TokenType::Int = token.token_type {
-        Some(Expression::Int(token.literal.parse::<usize>().unwrap()))
+        Some(Expression::Int(token.literal.parse::<isize>().unwrap()))
     } else {
         panic!("where is my integer");
     }
@@ -511,7 +511,7 @@ mod test {
         Some(error_string)
     }
 
-    fn test_integer_literal(statement: &ExpressionStatement, value: usize) {
+    fn test_integer_literal(statement: &ExpressionStatement, value: isize) {
         if statement.expression.is_none() {
             panic!("statement.expression.is_none");
         }
@@ -544,7 +544,7 @@ mod test {
     //fn test_literal_expression(expresssion: &Expression, expected: &Expression) {
     // use assert_eq!(expression, expected);
 
-    fn test_infix_expression(statement: &StatementType, left: usize, operator: &str, right: usize) {
+    fn test_infix_expression(statement: &StatementType, left: isize, operator: &str, right: isize) {
         if let StatementType::Expression(expression_statement) = &statement {
             if expression_statement.expression.is_none() {
                 panic!("statement.expression.is_none");

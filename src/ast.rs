@@ -162,7 +162,7 @@ pub enum Expression {
     Identifier(Identifier),
     Prefix(PrefixExpression),
     Infix(InfixExpression),
-    Int(usize),
+    Int(isize),
     Return,
     Assign,
     Boolean(BooleanExpression),
