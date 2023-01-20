@@ -26,6 +26,7 @@ fn main() -> io::Result<()> {
 
 
 fn start() -> io::Result<()> {
+    let mut evaluator = Evaluator::new();
     loop {
         print!("{}", PROMPT);
         io::stdout().flush()?;
@@ -48,7 +49,6 @@ fn start() -> io::Result<()> {
             continue;
         }
 
-        let mut evaluator = Evaluator::new();
         let evaluated = evaluator.eval_program(&program);
         if evaluated.is_some() {
             println!("{}", evaluated.unwrap());
