@@ -1,15 +1,34 @@
 use crate::{
     ast::{Expression, StatementType, Program, BlockStatement},
     object::Object,
-    token::TokenType,
+    token::TokenType, environment::Environment,
 };
 
-pub struct Evaluator;
+pub struct Evaluator {
+    env: Environment,
+}
 
 impl Evaluator {
+    pub fn new() -> Self {
+        Self { env: Environment::new() }
+    }
+
     fn eval_statement(&mut self, node: &StatementType) -> Option<Object> {
         match node {
-            StatementType::Let(_) => todo!(),
+            StatementType::Let(let_statement) => {
+                let value = self.eval_expression(&let_statement.value.as_ref().unwrap());
+                let value = match value {
+                    Some(value) => {
+                        if let Object::Error(_) = value {
+                            return Some(value);
+                        } else {
+                            value
+                        }
+                    }
+                    None => todo!(),
+                };
+                Some(self.env.set(let_statement.name.as_ref().unwrap().token.literal.clone(), value))
+            },
             StatementType::Return(return_statement) => {
                 let value = self
                     .eval_expression(
@@ -121,8 +140,22 @@ impl Evaluator {
                     Some(Object::Null)
                 }
             }
+            Expression::Identifier(ident) => {
+                let value = self.env.get(ident.token.literal.clone()).cloned();
+                match value {
+                    Some(obj) => {
+                        if let Object::Error(_) = obj {
+                            return Some(Object::new_error(&format!("(Some error) identifier not found: {}", ident.token.literal.clone())));
+                        } else {
+                            Some(obj)
+                        }
+                    }
+                    None => {
+                        Some(Object::new_error(&format!("(None error) identifier not found: {}", ident.token.literal.clone())))
+                    }
+                }
+            }
             /*
-            Expression::Identifier(_) => None,
             Expression::Return => todo!(),
             Expression::Assign => todo!(),
             Expression::FunctionLiteral(_) => todo!(),
@@ -249,7 +282,7 @@ mod test {
     fn test_eval(input: &str) -> Option<Object> {
         let mut parser = Parser::new(Lexer::new(input));
         let program = parser.parse_program();
-        let mut evaluator = Evaluator;
+        let mut evaluator = Evaluator::new();
         evaluator.eval_program(&program.unwrap())
     }
 
@@ -448,4 +481,19 @@ mod test {
             }
         }
     }
+
+    #[test]
+    fn test_let_statements() {
+        let tests = vec![
+            ("let a = 5; a;", 5),
+            ("let a = 5 * 5; a;", 25),
+            ("let a = 5; let b = a; b;", 5),
+            ("let a = 5; let b = a; let c = a + b + 5; c;", 15),
+        ];
+
+        for test in tests {
+            test_integer_object(test_eval(test.0).unwrap(), test.1);
+        }
+    }
+
 }
