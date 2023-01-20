@@ -48,7 +48,7 @@ fn start() -> io::Result<()> {
         }
 
         let mut evaluator = Evaluator;
-        let evaluated = evaluator.eval_statements(&program.statements);
+        let evaluated = evaluator.eval_program(&program);
         if evaluated.is_some() {
             println!("{}", evaluated.unwrap());
         }

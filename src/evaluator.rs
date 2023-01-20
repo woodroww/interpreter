@@ -1,5 +1,5 @@
 use crate::{
-    ast::{Expression, StatementType},
+    ast::{Expression, StatementType, Program, BlockStatement},
     object::Object,
     token::TokenType,
 };
@@ -10,7 +10,17 @@ impl Evaluator {
     fn eval_statement(&mut self, node: &StatementType) -> Option<Object> {
         match node {
             StatementType::Let(_) => todo!(),
-            StatementType::Return(_) => todo!(),
+            StatementType::Return(return_statement) => {
+                let value = self
+                    .eval_expression(
+                        return_statement
+                            .return_value
+                            .as_ref()
+                            .expect("do we have to have a return value, I assume"),
+                    )
+                    .expect("this to evalutate to something");
+                Some(Object::Return(Box::new(value)))
+            }
             StatementType::Expression(statement) => self.eval_expression(
                 statement
                     .expression
@@ -18,7 +28,7 @@ impl Evaluator {
                     .expect("will have to deal with this later"),
             ),
             StatementType::Block(block_statement) => {
-                self.eval_statements(&block_statement.statements)
+                self.eval_block_statement(&block_statement)
             }
         }
     }
@@ -51,7 +61,12 @@ impl Evaluator {
                 self.eval_infix_expression(infix.token.token_type, left, right)
             }
             Expression::If(if_expression) => {
-                let condition = self.eval_expression(&*if_expression.condition.as_ref().expect("do we have to have a condition?"));
+                let condition = self.eval_expression(
+                    &*if_expression
+                        .condition
+                        .as_ref()
+                        .expect("do we have to have a condition?"),
+                );
                 if is_truthy(condition.expect("idk")) {
                     if let Some(consequence) = &if_expression.consequence {
                         self.eval_statement(&StatementType::Block(*consequence.clone()))
@@ -84,12 +99,12 @@ impl Evaluator {
             (Object::Integer(a), Object::Integer(b)) => {
                 return self.eval_integer_infix_expression(operator, *a, *b);
             }
-            (_, _) => {},
+            (_, _) => {}
         }
         match operator {
             TokenType::Equal => return Some(Object::Boolean(left == right)),
             TokenType::NotEqual => return Some(Object::Boolean(left != right)),
-            _ => {},
+            _ => {}
         }
         if std::mem::discriminant(&left) != std::mem::discriminant(&right) {
             panic!("type mismatch: {} {} {}", left, operator, right);
@@ -139,10 +154,24 @@ impl Evaluator {
         }
     }
 
-    pub fn eval_statements(&mut self, statements: &Vec<StatementType>) -> Option<Object> {
+    pub fn eval_block_statement(&mut self, block: &BlockStatement) -> Option<Object> {
         let mut result = Some(Object::Null);
-        for statement in statements {
-            result = self.eval_statement(statement);
+        for statement in &block.statements {
+            result = self.eval_statement(&statement);
+            if let Some(Object::Return(_)) = result {
+                return Some(result.unwrap().clone());
+            }
+        }
+        result
+    }
+
+    pub fn eval_program(&mut self, program: &Program) -> Option<Object> {
+        let mut result = Some(Object::Null);
+        for statement in &program.statements {
+            result = self.eval_statement(&statement);
+            if let Some(Object::Return(return_value)) = result {
+                return Some(*return_value);
+            }
         }
         result
     }
@@ -153,6 +182,7 @@ fn is_truthy(object: Object) -> bool {
         Object::Integer(_) => true,
         Object::Boolean(b) => b,
         Object::Null => false,
+        Object::Return(_) => todo!(),
     }
 }
 
@@ -166,13 +196,13 @@ mod test {
         let mut parser = Parser::new(Lexer::new(input));
         let program = parser.parse_program();
         let mut evaluator = Evaluator;
-        evaluator.eval_statements(&program.unwrap().statements)
+        evaluator.eval_program(&program.unwrap())
     }
 
     fn test_integer_object(obj: Object, expected: isize) {
         match obj {
             Object::Integer(n) => assert_eq!(n, expected),
-            object => panic!("expected integer, got {}", object),
+            _ => panic!("expected integer, got {}", obj),
         }
     }
 
@@ -270,15 +300,13 @@ mod test {
         for test in tests {
             let evaluated = test_eval(test.0);
             match evaluated {
-                Some(obj) => {
-                    match test.1 {
-                        Some(n) => test_integer_object(obj, n),
-                        None => {
-                            assert_eq!(obj, Object::Null);
-                            println!("got evaluated to Object::Null");
-                        }
+                Some(obj) => match test.1 {
+                    Some(n) => test_integer_object(obj, n),
+                    None => {
+                        assert_eq!(obj, Object::Null);
+                        println!("got evaluated to Object::Null");
                     }
-                }
+                },
                 None => {
                     unreachable!();
                     //assert_eq!(None, test.1);
@@ -288,5 +316,28 @@ mod test {
         }
     }
 
+    #[test]
+    fn test_return_statements() {
+        let tests = vec![
+            ("return 10;", 10),
+            ("return 2 * 5; 9;", 10),
+            ("return 10; 9;", 10),
+            ("9; return 2 * 5; 9;", 10),
+            ("if (10 > 1) {
+    if (10 > 1) {
+        return 10;
+    }
+    return 1;
+}", 10),
+        ];
+
+        for test in tests {
+            let evaluated = test_eval(test.0);
+            match evaluated {
+                Some(obj) => test_integer_object(obj, test.1),
+                None => panic!("didn't evaluate to anything"),
+            }
+        }
+    }
 
 }
