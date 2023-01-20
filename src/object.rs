@@ -3,6 +3,7 @@ pub enum Object {
     Integer(isize),
     Boolean(bool),
     Return(Box<Object>),
+    Error(String),
     Null,
 }
 
@@ -16,6 +17,13 @@ impl std::fmt::Display for Object {
             }
             Object::Return(obj) => write!(f, "{}", obj),
             Object::Null => write!(f, "Null"),
+            Object::Error(err) => write!(f, "error {}", err),
         }
+    }
+}
+
+impl Object {
+    pub fn new_error(error_string: &str) -> Object {
+        Self::Error(error_string.to_string())
     }
 }

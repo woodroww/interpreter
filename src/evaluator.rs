@@ -19,6 +19,9 @@ impl Evaluator {
                             .expect("do we have to have a return value, I assume"),
                     )
                     .expect("this to evalutate to something");
+                if let Object::Error(_) = value {
+                    return Some(value);
+                }
                 Some(Object::Return(Box::new(value)))
             }
             StatementType::Expression(statement) => self.eval_expression(
@@ -39,6 +42,15 @@ impl Evaluator {
             Expression::Boolean(b) => Some(Object::Boolean(b.value)),
             Expression::Prefix(prefix) => {
                 let right = self.eval_expression(&prefix.right.as_ref().unwrap());
+                match &right {
+                    Some(right) => {
+                        if let Object::Error(_) = right {
+                            return Some(right.clone());
+                        }
+                    }
+                    None => todo!(),
+                }
+
                 self.eval_prefix_expression(prefix.token.token_type, right.unwrap())
             }
             Expression::Infix(infix) => {
@@ -48,16 +60,36 @@ impl Evaluator {
                             .left
                             .as_ref()
                             .expect("will have to deal with this later"),
-                    )
-                    .expect("will have to deal with this later");
+                    );
+                let left = match left {
+                    Some(left) => {
+                        if let Object::Error(_) = left {
+                            return Some(left.clone());
+                        } else {
+                            left
+                        }
+                    }
+                    None => todo!(),
+                };
+
                 let right = self
                     .eval_expression(
                         infix
                             .right
                             .as_ref()
                             .expect("will have to deal with this later"),
-                    )
-                    .expect("will have to deal with this later");
+                    );
+                let right = match right {
+                    Some(right) => {
+                        if let Object::Error(_) = right {
+                            return Some(right.clone());
+                        } else {
+                            right
+                        }
+                    }
+                    None => todo!(),
+                };
+
                 self.eval_infix_expression(infix.token.token_type, left, right)
             }
             Expression::If(if_expression) => {
@@ -67,7 +99,17 @@ impl Evaluator {
                         .as_ref()
                         .expect("do we have to have a condition?"),
                 );
-                if is_truthy(condition.expect("idk")) {
+                let condition = match condition {
+                    Some(condition) => {
+                        if let Object::Error(_) = condition {
+                            return Some(condition.clone());
+                        } else {
+                            condition
+                        }
+                    }
+                    None => todo!(),
+                };
+                if is_truthy(condition) {
                     if let Some(consequence) = &if_expression.consequence {
                         self.eval_statement(&StatementType::Block(*consequence.clone()))
                     } else {
@@ -107,9 +149,10 @@ impl Evaluator {
             _ => {}
         }
         if std::mem::discriminant(&left) != std::mem::discriminant(&right) {
-            panic!("type mismatch: {} {} {}", left, operator, right);
+            Some(Object::new_error(&format!("type mismatch: {} {} {}", left, operator, right)))
+        } else {
+            Some(Object::new_error(&format!("unknown operator: {} {} {}", left, operator, right)))
         }
-        panic!("unknown operator: {} {} {}", left, operator, right);
     }
 
     fn eval_integer_infix_expression(
@@ -127,7 +170,7 @@ impl Evaluator {
             TokenType::GreaterThan => Some(Object::Boolean(left > right)),
             TokenType::Equal => Some(Object::Boolean(left == right)),
             TokenType::NotEqual => Some(Object::Boolean(left != right)),
-            _ => None,
+            _ => Some(Object::new_error(&format!("unknown operator {} {} {}", left, token, right))),
         }
     }
 
@@ -135,7 +178,7 @@ impl Evaluator {
         match token {
             TokenType::Bang => self.eval_bang_operator_expression(right),
             TokenType::Minus => self.eval_minus_prefix_operator_expression(right),
-            _ => None,
+            _ => Some(Object::new_error(&format!("unknown operator {}{}", token, right))),
         }
     }
 
@@ -150,7 +193,7 @@ impl Evaluator {
     fn eval_minus_prefix_operator_expression(&self, right: Object) -> Option<Object> {
         match right {
             Object::Integer(n) => Some(Object::Integer(-n)),
-            _ => None,
+            _ => Some(Object::new_error(&format!("unknown operator -{}", right))),
         }
     }
 
@@ -161,6 +204,9 @@ impl Evaluator {
             if let Some(Object::Return(_)) = result {
                 return Some(result.unwrap().clone());
             }
+            if let Some(Object::Error(_)) = result {
+                return Some(result.unwrap().clone());
+            }
         }
         result
     }
@@ -169,8 +215,13 @@ impl Evaluator {
         let mut result = Some(Object::Null);
         for statement in &program.statements {
             result = self.eval_statement(&statement);
-            if let Some(Object::Return(return_value)) = result {
-                return Some(*return_value);
+            match &result {
+                Some(obj) => match obj {
+                    Object::Return(return_value) => return Some(*return_value.clone()),
+                    Object::Error(_err) => return result,
+                    _ => {},
+                }
+                None => {},
             }
         }
         result
@@ -182,7 +233,10 @@ fn is_truthy(object: Object) -> bool {
         Object::Integer(_) => true,
         Object::Boolean(b) => b,
         Object::Null => false,
-        Object::Return(_) => todo!(),
+        _ => false,
+        //Object::Return(_) => todo!(),
+        //Object::Error(_) => todo!(),
+
     }
 }
 
@@ -340,4 +394,58 @@ mod test {
         }
     }
 
+    #[test]
+    fn test_error_handling() {
+        let tests = vec![
+        (
+            "5 + true;",
+            "type mismatch: INTEGER + BOOLEAN",
+        ),
+        (
+            "5 + true; 5;",
+            "type mismatch: INTEGER + BOOLEAN",
+        ),
+        (
+            "-true",
+            "unknown operator: -BOOLEAN",
+        ),
+        (
+            "true + false;",
+            "unknown operator: BOOLEAN + BOOLEAN",
+        ),
+        (
+          "5; true + false; 5",
+            "unknown operator: BOOLEAN + BOOLEAN",
+        ),
+        (
+            "if (10 > 1) { true + false; }",
+            "unknown operator: BOOLEAN + BOOLEAN",
+        ),
+        (
+            "if (10 > 1) {
+  if (10 > 1) {
+    return true + false;
+  }
+
+  return 1;
+}
+",
+            "unknown operator: BOOLEAN + BOOLEAN",
+        ),
+        ];
+
+        for test in tests {
+            let evaluated = test_eval(test.0);
+            match evaluated {
+                Some(obj) => {
+                    if let Object::Error(err) = obj {
+                        println!("{}", err);
+                    } else {
+                        panic!("didn't get error");
+                    }
+                }
+                None => panic!("didn't evaluate to anything"),
+            }
+        }
+    }
 }
