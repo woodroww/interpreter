@@ -1,5 +1,7 @@
+use std::cell::RefCell;
 use std::io;
 use std::io::Write;
+use std::rc::Rc;
 use interpreter::{lexer::Lexer, parser::Parser};
 use interpreter::evaluator::*;
 use interpreter::environment::Environment;
@@ -26,7 +28,8 @@ fn main() -> io::Result<()> {
 
 
 fn start() -> io::Result<()> {
-    let mut evaluator = Evaluator::new();
+    let mut evaluator = Evaluator;
+    let env = Rc::new(RefCell::new(Environment::new()));
     loop {
         print!("{}", PROMPT);
         io::stdout().flush()?;
@@ -49,7 +52,8 @@ fn start() -> io::Result<()> {
             continue;
         }
 
-        let evaluated = evaluator.eval_program(&program, evaluator.env.clone());
+        // is this cloning a problem or is the rc released each loop ?
+        let evaluated = evaluator.eval_program(&program, env.clone());
         if evaluated.is_some() {
             println!("{}", evaluated.unwrap());
         }
@@ -57,6 +61,15 @@ fn start() -> io::Result<()> {
         //println!("{}", program);
     }
 }
+
+/*
+let newAdder = fn(x) { fn(y) { x + y } };
+let addTwo = newAdder(2);
+addTwo(3);
+ 5
+let addThree = newAdder(3);
+addThree(10);
+*/
 
 fn print_parse_errors(errors: Vec<String>) {
     let mut error_string = if errors.len() == 1 {

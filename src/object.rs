@@ -23,7 +23,7 @@ impl std::fmt::Display for Object {
             Object::Return(obj) => write!(f, "{}", obj),
             Object::Null => write!(f, "Null"),
             Object::Error(err) => write!(f, "error {}", err),
-            Object::Function(_) => todo!(),
+            Object::Function(function) => write!(f, "{}", function),
         }
     }
 }

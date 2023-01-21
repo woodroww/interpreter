@@ -1,7 +1,7 @@
 use crate::token::Token;
 
 // -----------------------------------------------------------------------------
-//  NodeInterface 
+//  NodeInterface
 // -----------------------------------------------------------------------------
 
 pub trait NodeInterface {
@@ -27,7 +27,6 @@ pub struct Identifier {
 
 impl std::fmt::Display for Identifier {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        //write!(f, "Identifier:")?;
         write!(f, "{}", self.token.literal)
     }
 }
@@ -81,7 +80,10 @@ pub struct BlockStatement {
 
 impl BlockStatement {
     pub fn new(token: Token) -> Self {
-        Self { token, statements: Vec::new() }
+        Self {
+            token,
+            statements: Vec::new(),
+        }
     }
     pub fn with_statements(mut self, statements: Vec<StatementType>) -> Self {
         self.statements = statements;
@@ -91,7 +93,6 @@ impl BlockStatement {
 
 impl std::fmt::Display for BlockStatement {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        //write!(f, "BlockStatement:")
         for s in self.statements.iter() {
             write!(f, "{}", s)?;
         }
@@ -109,7 +110,12 @@ pub struct IfExpression {
 
 impl IfExpression {
     pub fn new(token: Token) -> Self {
-        Self { token, condition: None, consequence: None, alternative: None }
+        Self {
+            token,
+            condition: None,
+            consequence: None,
+            alternative: None,
+        }
     }
 
     pub fn with_condition(mut self, expression: Expression) -> Self {
@@ -134,7 +140,6 @@ impl NodeInterface for IfExpression {
 
 impl std::fmt::Display for IfExpression {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        //write!(f, "IfExpression:")?;
         let condition = match &self.condition {
             Some(c) => format!("{}", c),
             None => format!(""),
@@ -173,24 +178,23 @@ pub enum Expression {
 
 impl std::fmt::Display for Expression {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        //write!(f, "ExpressionType:")?;
         match self {
             Expression::Prefix(prefix) => write!(f, "{}", prefix),
             Expression::Identifier(ident) => write!(f, "{}", ident),
             Expression::Int(integer) => write!(f, "{}", integer),
-            Expression::Infix(infix) => write!(f, "{}", infix), 
+            Expression::Infix(infix) => write!(f, "{}", infix),
             Expression::Return => write!(f, "return"),
             Expression::Assign => write!(f, "="),
             Expression::Boolean(b) => write!(f, "{}", b.value),
             Expression::If(_) => todo!(),
-            Expression::FunctionLiteral(_) => todo!(),
+            Expression::FunctionLiteral(function_literal) => write!(f, "{}", function_literal),
             Expression::Call(c) => write!(f, "{}", c),
         }
     }
 }
 
 // -----------------------------------------------------------------------------
-//  PrefixExpression 
+//  PrefixExpression
 // -----------------------------------------------------------------------------
 
 #[derive(Debug, Eq, PartialEq, Clone)]
@@ -202,10 +206,7 @@ pub struct PrefixExpression {
 
 impl PrefixExpression {
     pub fn new(token: Token) -> Self {
-        Self {
-            token,
-            right: None,
-        }
+        Self { token, right: None }
     }
     pub fn with_right(mut self, expression: Expression) -> Self {
         self.right = Some(Box::new(expression));
@@ -215,7 +216,6 @@ impl PrefixExpression {
 
 impl std::fmt::Display for PrefixExpression {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        //write!(f, "PrefixExpression:")?;
         write!(f, "(")?;
         write!(f, "{}", self.token.literal)?;
         let right = match &self.right {
@@ -228,7 +228,7 @@ impl std::fmt::Display for PrefixExpression {
 }
 
 // -----------------------------------------------------------------------------
-//  InfixExpression 
+//  InfixExpression
 // -----------------------------------------------------------------------------
 
 #[derive(Debug, Eq, PartialEq, Clone)]
@@ -264,7 +264,6 @@ impl InfixExpression {
 
 impl std::fmt::Display for InfixExpression {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        //write!(f, "InfixExpression:")?;
         write!(f, "(")?;
         let left = match &self.left {
             Some(l) => format!("{}", l),
@@ -278,7 +277,6 @@ impl std::fmt::Display for InfixExpression {
         write!(f, " {}", self.token.literal)?;
         write!(f, " {}", right)?;
         write!(f, ")")
-        //write!(f, "")
     }
 }
 
@@ -318,7 +316,6 @@ impl std::fmt::Display for CallExpression {
             Some(function) => write!(f, "{}", function)?,
             None => write!(f, "")?,
         };
-        //write!(f, "{}", self.function)?;
         write!(f, "(")?;
         for (i, argument) in self.arguments.iter().enumerate() {
             if i == self.arguments.len() - 1 {
@@ -327,8 +324,7 @@ impl std::fmt::Display for CallExpression {
                 write!(f, "{}, ", argument)?;
             }
         }
-        write!(f, ")")?;
-        Ok(())
+        write!(f, ")")
     }
 }
 
@@ -349,7 +345,6 @@ pub enum StatementType {
 
 impl std::fmt::Display for StatementType {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        //write!(f, "StatementType:")?;
         match self {
             StatementType::Let(s) => write!(f, "{}", s),
             StatementType::Return(s) => write!(f, "{}", s),
@@ -365,7 +360,6 @@ pub struct Program {
 
 impl std::fmt::Display for Program {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        //write!(f, "Program:")?;
         for (_i, s) in self.statements.iter().enumerate() {
             write!(f, "{}", s)?;
         }
@@ -405,7 +399,6 @@ pub struct LetStatement {
 
 impl std::fmt::Display for LetStatement {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        //write!(f, "LetStatement:")?;
         write!(f, "{}", self.token_literal() + " ")?;
         let name: String = match &self.name {
             Some(ident) => format!("{}", ident),
@@ -465,10 +458,9 @@ impl std::fmt::Display for ReturnStatement {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "ReturnStatement:")?;
         write!(f, "{} ", self.token_literal())?;
-        if self.return_value.is_some() {
-            write!(f, "{}", self.return_value.as_ref().unwrap())?;
-        } else {
-            write!(f, "idk return?")?;
+        match &self.return_value {
+            Some(value) => write!(f, "{}", value)?,
+            None => write!(f, "idk return?")?,
         }
         write!(f, ";")
     }
@@ -522,7 +514,6 @@ impl ExpressionStatement {
 
 impl std::fmt::Display for ExpressionStatement {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        //write!(f, "ExpressionStatement:")?;
         let expression = match &self.expression {
             Some(e) => format!("{}", e),
             None => format!(""),
@@ -573,20 +564,40 @@ impl FunctionLiteralExpression {
     }
 }
 
+impl std::fmt::Display for FunctionLiteralExpression {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let param_string = self
+            .parameters
+            .iter()
+            .map(|ident| ident.token.literal.clone())
+            .collect::<Vec<String>>()
+            .join(", ");
+        write!(
+            f,
+            "fn({}) {{\n{}\n}}",
+            param_string,
+            self.body.as_ref().unwrap()
+        )
+    }
+}
 
 #[cfg(test)]
 mod test {
     use super::*;
-    use pretty_assertions::assert_eq;
     use crate::token::TokenType;
+    use pretty_assertions::assert_eq;
 
     #[test]
-    fn test_display() { // TestString in book
+    fn test_display() {
+        // TestString in book
         let program = Program::new();
         let mut let_statement = LetStatement::new(Token::new(TokenType::Let, "let"));
         let_statement.name = Some(Identifier::new(Token::new(TokenType::Ident, "myVar")));
-        let_statement.value = Some(Expression::Identifier(Identifier::new(Token::new(TokenType::Ident, "anotherVar"))));
-        
+        let_statement.value = Some(Expression::Identifier(Identifier::new(Token::new(
+            TokenType::Ident,
+            "anotherVar",
+        ))));
+
         assert_eq!(&format!("{}", let_statement), "let myVar = anotherVar;");
     }
 }
