@@ -49,7 +49,7 @@ fn start() -> io::Result<()> {
             continue;
         }
 
-        let evaluated = evaluator.eval_program(&program);
+        let evaluated = evaluator.eval_program(&program, evaluator.env.clone());
         if evaluated.is_some() {
             println!("{}", evaluated.unwrap());
         }

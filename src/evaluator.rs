@@ -1,22 +1,24 @@
+use std::{cell::RefCell, rc::Rc};
+
 use crate::{
     ast::{Expression, StatementType, Program, BlockStatement},
-    object::Object,
+    object::{Object, FunctionObject},
     token::TokenType, environment::Environment,
 };
 
 pub struct Evaluator {
-    env: Environment,
+    pub env: Rc<RefCell<Environment>>,
 }
 
 impl Evaluator {
     pub fn new() -> Self {
-        Self { env: Environment::new() }
+        Self { env: Rc::new(RefCell::new(Environment::new())) }
     }
 
-    fn eval_statement(&mut self, node: &StatementType) -> Option<Object> {
+    fn eval_statement(&mut self, node: &StatementType, env: Rc<RefCell<Environment>>) -> Option<Object> {
         match node {
             StatementType::Let(let_statement) => {
-                let value = self.eval_expression(&let_statement.value.as_ref().unwrap());
+                let value = self.eval_expression(&let_statement.value.as_ref().unwrap(), env.clone());
                 let value = match value {
                     Some(value) => {
                         if let Object::Error(_) = value {
@@ -27,7 +29,7 @@ impl Evaluator {
                     }
                     None => todo!(),
                 };
-                Some(self.env.set(let_statement.name.as_ref().unwrap().token.literal.clone(), value))
+                Some(env.borrow_mut().set(let_statement.name.as_ref().unwrap().token.literal.clone(), value))
             },
             StatementType::Return(return_statement) => {
                 let value = self
@@ -36,6 +38,7 @@ impl Evaluator {
                             .return_value
                             .as_ref()
                             .expect("do we have to have a return value, I assume"),
+                        env,
                     )
                     .expect("this to evalutate to something");
                 if let Object::Error(_) = value {
@@ -48,19 +51,20 @@ impl Evaluator {
                     .expression
                     .as_ref()
                     .expect("will have to deal with this later"),
+                env,
             ),
             StatementType::Block(block_statement) => {
-                self.eval_block_statement(&block_statement)
+                self.eval_block_statement(&block_statement, env)
             }
         }
     }
 
-    fn eval_expression(&mut self, expression: &Expression) -> Option<Object> {
+    fn eval_expression(&mut self, expression: &Expression, env: Rc<RefCell<Environment>>) -> Option<Object> {
         match &expression {
             Expression::Int(n) => Some(Object::Integer(*n)),
             Expression::Boolean(b) => Some(Object::Boolean(b.value)),
             Expression::Prefix(prefix) => {
-                let right = self.eval_expression(&prefix.right.as_ref().unwrap());
+                let right = self.eval_expression(&prefix.right.as_ref().unwrap(), env);
                 match &right {
                     Some(right) => {
                         if let Object::Error(_) = right {
@@ -79,6 +83,7 @@ impl Evaluator {
                             .left
                             .as_ref()
                             .expect("will have to deal with this later"),
+                        env.clone(),
                     );
                 let left = match left {
                     Some(left) => {
@@ -97,6 +102,7 @@ impl Evaluator {
                             .right
                             .as_ref()
                             .expect("will have to deal with this later"),
+                        env,
                     );
                 let right = match right {
                     Some(right) => {
@@ -117,6 +123,7 @@ impl Evaluator {
                         .condition
                         .as_ref()
                         .expect("do we have to have a condition?"),
+                    env.clone(),
                 );
                 let condition = match condition {
                     Some(condition) => {
@@ -130,18 +137,18 @@ impl Evaluator {
                 };
                 if is_truthy(condition) {
                     if let Some(consequence) = &if_expression.consequence {
-                        self.eval_statement(&StatementType::Block(*consequence.clone()))
+                        self.eval_statement(&StatementType::Block(*consequence.clone()), env.clone())
                     } else {
                         Some(Object::Null)
                     }
                 } else if let Some(alternative) = &if_expression.alternative {
-                    self.eval_statement(&StatementType::Block(*alternative.clone()))
+                    self.eval_statement(&StatementType::Block(*alternative.clone()), env)
                 } else {
                     Some(Object::Null)
                 }
             }
             Expression::Identifier(ident) => {
-                let value = self.env.get(ident.token.literal.clone()).cloned();
+                let value = env.borrow().get(ident.token.literal.clone()).clone();
                 match value {
                     Some(obj) => {
                         if let Object::Error(_) = obj {
@@ -155,13 +162,70 @@ impl Evaluator {
                     }
                 }
             }
+            Expression::FunctionLiteral(function_literal) => {
+                let obj = FunctionObject {
+                    parameters: function_literal.parameters.clone(),
+                    body: function_literal.body.clone(),
+                    env: Rc::clone(&env),
+                };
+                Some(Object::Function(obj))
+            }
+            Expression::Call(call_expression) => {
+                let function = self.eval_expression(&call_expression.function.as_ref().unwrap(), env.clone()).unwrap();
+                if let Object::Error(_) = function {
+                    return Some(function);
+                }
+                let args = self.eval_expressions(&call_expression.arguments, env);
+                if args.len() == 1 {
+                    if let Object::Error(_) = args[0] {
+                        return Some(args[0].clone());
+                    }
+                }
+                match function {
+                    Object::Function(f) => self.apply_function(f, args),
+                    _ => Some(Object::Error(format!("not a function: {}", function))),
+                }
+            }
             /*
             Expression::Return => todo!(),
             Expression::Assign => todo!(),
-            Expression::FunctionLiteral(_) => todo!(),
-            Expression::Call(_) => todo!(),*/
+*/
             _ => None,
         }
+    }
+
+    fn apply_function(&mut self, function: FunctionObject, args: Vec<Object>) -> Option<Object> {
+        let extended_env = self.extend_function_env(&function, &args);
+        let evaluated = self.eval_block_statement(function.body.as_ref().unwrap(), Rc::new(RefCell::new(extended_env)));
+        Some(self.unwrap_return_value(evaluated.unwrap()))
+    }
+
+    fn extend_function_env(&mut self, function: &FunctionObject, args: &Vec<Object>) -> Environment {
+        let mut env = Environment::new().with_outer(self.env.clone());
+        for (param, arg) in function.parameters.iter().zip(args) {
+            env.set(param.token.literal.clone(), arg.clone());
+        }
+        env
+    }
+
+    fn unwrap_return_value(&self, obj: Object) -> Object {
+        if let Object::Return(value) = obj {
+            *value
+        } else {
+            obj
+        }
+    }
+
+    fn eval_expressions(&mut self, args: &Vec<Expression>, env: Rc<RefCell<Environment>>) -> Vec<Object> {
+        let mut result = Vec::new();
+        for expression in args {
+            let evaluated = self.eval_expression(expression, env.clone()).unwrap();
+            if let Object::Error(_) = evaluated {
+                return vec![evaluated];
+            }
+            result.push(evaluated);
+        }
+        result
     }
 
     fn eval_infix_expression(
@@ -230,10 +294,10 @@ impl Evaluator {
         }
     }
 
-    pub fn eval_block_statement(&mut self, block: &BlockStatement) -> Option<Object> {
+    pub fn eval_block_statement(&mut self, block: &BlockStatement, env: Rc<RefCell<Environment>>) -> Option<Object> {
         let mut result = Some(Object::Null);
         for statement in &block.statements {
-            result = self.eval_statement(&statement);
+            result = self.eval_statement(&statement, env.clone());
             if let Some(Object::Return(_)) = result {
                 return Some(result.unwrap().clone());
             }
@@ -244,10 +308,10 @@ impl Evaluator {
         result
     }
 
-    pub fn eval_program(&mut self, program: &Program) -> Option<Object> {
+    pub fn eval_program(&mut self, program: &Program, env: Rc<RefCell<Environment>>) -> Option<Object> {
         let mut result = Some(Object::Null);
         for statement in &program.statements {
-            result = self.eval_statement(&statement);
+            result = self.eval_statement(&statement, env.clone());
             match &result {
                 Some(obj) => match obj {
                     Object::Return(return_value) => return Some(*return_value.clone()),
@@ -283,7 +347,7 @@ mod test {
         let mut parser = Parser::new(Lexer::new(input));
         let program = parser.parse_program();
         let mut evaluator = Evaluator::new();
-        evaluator.eval_program(&program.unwrap())
+        evaluator.eval_program(&program.unwrap(), evaluator.env.clone())
     }
 
     fn test_integer_object(obj: Object, expected: isize) {
@@ -496,4 +560,46 @@ mod test {
         }
     }
 
+    #[test]
+    fn test_function_object() {
+        let input = "fn(x) { x + 2; };";
+        let evaluated = test_eval(input).unwrap();
+
+        if let Object::Function(function) = evaluated {
+
+            if function.parameters.len() != 1 {
+                panic!("function has wrong parameters. Parameters {:?}", function.parameters);
+            }
+
+            if format!("{}", function.parameters[0]) != "x" {
+                panic!("parameter is not 'x'. got {}", function.parameters[0]);
+            }
+
+            let expected_body = "(x + 2)";
+
+            let function_body = format!("{}", function.body.unwrap());
+            if function_body != expected_body {
+                panic!("body is not {}. got {}", expected_body, function_body);
+            }
+
+        } else {
+            panic!("object is not Function. got {}", evaluated);
+        }
+    }
+
+    #[test]
+    fn test_function_application() {
+        let tests = vec![
+            ("let identity = fn(x) { x; }; identity(5);", 5),
+            ("let identity = fn(x) { return x; }; identity(5);", 5),
+            ("let double = fn(x) { x * 2; }; double(5);", 10),
+            ("let add = fn(x, y) { x + y; }; add(5, 5);", 10),
+            ("let add = fn(x, y) { x + y; }; add(5 + 5, add(5, 5));", 20),
+            ("fn(x) { x; }(5)", 5),
+        ];
+
+        for test in tests {
+            test_integer_object(test_eval(test.0).unwrap(), test.1);
+        }
+    }
 }
