@@ -1,4 +1,4 @@
-use crate::token::Token;
+use crate::token::{Token, TokenType};
 
 // -----------------------------------------------------------------------------
 //  NodeInterface
@@ -174,6 +174,7 @@ pub enum Expression {
     If(IfExpression),
     FunctionLiteral(FunctionLiteralExpression),
     Call(CallExpression),
+    String(StringLiteral),
 }
 
 impl std::fmt::Display for Expression {
@@ -189,6 +190,7 @@ impl std::fmt::Display for Expression {
             Expression::If(_) => todo!(),
             Expression::FunctionLiteral(function_literal) => write!(f, "{}", function_literal),
             Expression::Call(c) => write!(f, "{}", c),
+            Expression::String(s) => write!(f, "{}", s),
         }
     }
 }
@@ -581,6 +583,27 @@ impl std::fmt::Display for FunctionLiteralExpression {
     }
 }
 
+#[derive(Debug, PartialEq, Eq, Clone)]
+pub struct StringLiteral {
+    token: Token,
+    pub value: String,
+}
+
+impl std::fmt::Display for StringLiteral {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.token.literal)
+    }
+}
+
+impl StringLiteral {
+    pub fn new(input: &str) -> Self {
+        Self {
+            token: Token::new(TokenType::String, input),
+            value: input.to_string(),
+        }
+    }
+}
+
 #[cfg(test)]
 mod test {
     use super::*;
@@ -590,7 +613,7 @@ mod test {
     #[test]
     fn test_display() {
         // TestString in book
-        let program = Program::new();
+        //let program = Program::new();
         let mut let_statement = LetStatement::new(Token::new(TokenType::Let, "let"));
         let_statement.name = Some(Identifier::new(Token::new(TokenType::Ident, "myVar")));
         let_statement.value = Some(Expression::Identifier(Identifier::new(Token::new(

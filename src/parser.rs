@@ -2,9 +2,9 @@ use std::collections::HashMap;
 
 use crate::{
     ast::{
-        BlockStatement, BooleanExpression, Expression, ExpressionStatement, FunctionLiteralExpression,
-        Identifier, IfExpression, InfixExpression, LetStatement, PrefixExpression, Program,
-        ReturnStatement, StatementType, CallExpression,
+        BlockStatement, BooleanExpression, CallExpression, Expression, ExpressionStatement,
+        FunctionLiteralExpression, Identifier, IfExpression, InfixExpression, LetStatement,
+        PrefixExpression, Program, ReturnStatement, StatementType, StringLiteral,
     },
     lexer::Lexer,
     token::{Token, TokenType},
@@ -159,6 +159,11 @@ fn parse_fn_literal(parser: &mut Parser) -> Option<Expression> {
     Some(Expression::FunctionLiteral(literal))
 }
 
+fn parse_string_literal(parser: &mut Parser) -> Option<Expression> {
+    let current = parser.current_clone();
+    Some(Expression::String(StringLiteral::new(&current.literal)))
+}
+
 impl<'a> Parser<'a> {
     pub fn new(lexer: Lexer<'a>) -> Self {
         let precedences = HashMap::from([
@@ -193,6 +198,7 @@ impl<'a> Parser<'a> {
         parser.register_prefix(TokenType::Lparen, parse_grouped_expression);
         parser.register_prefix(TokenType::If, parse_if_expression);
         parser.register_prefix(TokenType::Function, parse_fn_literal);
+        parser.register_prefix(TokenType::String, parse_string_literal);
 
         parser.register_infix(TokenType::Plus, parse_infix_expression);
         parser.register_infix(TokenType::Minus, parse_infix_expression);
@@ -452,7 +458,6 @@ impl<'a> Parser<'a> {
         Some(args)
     }
 
-
     fn peek_token_is(&self, token: &TokenType) -> bool {
         if self.peek_token.is_none() {
             return false;
@@ -496,7 +501,7 @@ impl<'a> Parser<'a> {
 mod test {
 
     use super::*;
-    use crate::ast::NodeInterface;
+    use crate::ast::{NodeInterface, StringLiteral};
     use pretty_assertions::assert_eq;
 
     fn check_parser_errors(parser: &Parser) -> Option<String> {
@@ -584,7 +589,7 @@ mod test {
         let expected = StatementType::Let(
             LetStatement::new(Token::new(TokenType::Let, "let"))
                 .with_value(Expression::Int(value))
-                .with_name(Identifier::new(Token::new(TokenType::Ident, ident)))
+                .with_name(Identifier::new(Token::new(TokenType::Ident, ident))),
         );
         assert_eq!(program.statements[0], expected);
     }
@@ -605,7 +610,10 @@ mod test {
         let expected = StatementType::Let(
             LetStatement::new(Token::new(TokenType::Let, "let"))
                 .with_name(Identifier::new(Token::new(TokenType::Ident, "y")))
-                .with_value(Expression::Boolean(BooleanExpression::new(Token::new(TokenType::True, "true"))))
+                .with_value(Expression::Boolean(BooleanExpression::new(Token::new(
+                    TokenType::True,
+                    "true",
+                )))),
         );
         assert_eq!(program.statements[0], expected);
     }
@@ -626,7 +634,10 @@ mod test {
         let expected = StatementType::Let(
             LetStatement::new(Token::new(TokenType::Let, "let"))
                 .with_name(Identifier::new(Token::new(TokenType::Ident, "foobar")))
-                .with_value(Expression::Identifier(Identifier::new(Token::new(TokenType::Ident, "y"))))
+                .with_value(Expression::Identifier(Identifier::new(Token::new(
+                    TokenType::Ident,
+                    "y",
+                )))),
         );
         assert_eq!(program.statements[0], expected);
     }
@@ -659,7 +670,10 @@ let foobar = 838383;
                 assert_eq!(*s.value.as_ref().unwrap(), expression);
                 assert_eq!(s.name.as_ref().unwrap().token_literal(), expected_idents[i]);
             } else {
-                panic!("expected StatementType::Let, got {} instead", program.statements[i]);
+                panic!(
+                    "expected StatementType::Let, got {} instead",
+                    program.statements[i]
+                );
             }
         }
     }
@@ -1162,12 +1176,13 @@ return 993322;
                 expected_parameters.push(Identifier::new(Token::new(TokenType::Ident, parameter)));
             }
             let expected = StatementType::Expression(
-                ExpressionStatement::new(Token::new(TokenType::Function, "fn"))
-                    .with_expression(Expression::FunctionLiteral(
+                ExpressionStatement::new(Token::new(TokenType::Function, "fn")).with_expression(
+                    Expression::FunctionLiteral(
                         FunctionLiteralExpression::new(Token::new(TokenType::Function, "fn"))
                             .with_parameters(expected_parameters)
-                            .with_body(BlockStatement::new(Token::new(TokenType::Lbrace, "{")))
-                    )),
+                            .with_body(BlockStatement::new(Token::new(TokenType::Lbrace, "{"))),
+                    ),
+                ),
             );
 
             let statement = &program.statements[0];
@@ -1188,28 +1203,54 @@ return 993322;
         assert_eq!(program.statements.len(), 1);
 
         let statement = &program.statements[0];
-        let expected = StatementType::Expression(ExpressionStatement::new(Token::new(TokenType::Ident, "add"))
-            .with_expression(Expression::Call(CallExpression::new(Token::new(TokenType::Lparen, "(")).with_function(
-                Expression::Identifier(Identifier::new(Token::new(TokenType::Ident, "add")))
-            ).with_arguments(
-                    vec![
-                        Expression::Int(1),
-                        Expression::Infix(
-                            InfixExpression::new(Token::new(TokenType::Asterisk, "*"))
-                                .with_left(Expression::Int(2))
-                                .with_right(Expression::Int(3))
-                        ),
-                        Expression::Infix(
-                            InfixExpression::new(Token::new(TokenType::Plus, "+"))
-                                .with_left(Expression::Int(4))
-                                .with_right(Expression::Int(5))
-                        ),
-                    ]
-                ))
-            )
+        let expected = StatementType::Expression(
+            ExpressionStatement::new(Token::new(TokenType::Ident, "add")).with_expression(
+                Expression::Call(
+                    CallExpression::new(Token::new(TokenType::Lparen, "("))
+                        .with_function(Expression::Identifier(Identifier::new(Token::new(
+                            TokenType::Ident,
+                            "add",
+                        ))))
+                        .with_arguments(vec![
+                            Expression::Int(1),
+                            Expression::Infix(
+                                InfixExpression::new(Token::new(TokenType::Asterisk, "*"))
+                                    .with_left(Expression::Int(2))
+                                    .with_right(Expression::Int(3)),
+                            ),
+                            Expression::Infix(
+                                InfixExpression::new(Token::new(TokenType::Plus, "+"))
+                                    .with_left(Expression::Int(4))
+                                    .with_right(Expression::Int(5)),
+                            ),
+                        ]),
+                ),
+            ),
         );
 
         assert_eq!(*statement, expected);
     }
 
+    #[test]
+    fn test_string_literal_expression() {
+        let input = "\"hello world\"";
+
+        let lexer = Lexer::new(input);
+        let mut parser = Parser::new(lexer);
+        let program = parser.parse_program().unwrap();
+        let error_string = check_parser_errors(&parser);
+        if error_string.is_some() {
+            println!("{}", error_string.unwrap());
+        }
+        assert_eq!(program.statements.len(), 1);
+        let statement = &program.statements[0];
+
+        let token = Token::new(TokenType::String, "hello world");
+        let expected = StatementType::Expression(
+            ExpressionStatement::new(token)
+                .with_expression(Expression::String(StringLiteral::new("hello world"))),
+        );
+
+        assert_eq!(*statement, expected);
+    }
 }

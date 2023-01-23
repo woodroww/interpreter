@@ -9,6 +9,7 @@ pub enum Object {
     Return(Box<Object>),
     Error(String),
     Function(FunctionObject),
+    String(String),
     Null,
 }
 
@@ -24,6 +25,7 @@ impl std::fmt::Display for Object {
             Object::Null => write!(f, "Null"),
             Object::Error(err) => write!(f, "error {}", err),
             Object::Function(function) => write!(f, "{}", function),
+            Object::String(s) => write!(f, "{}", s),
         }
     }
 }

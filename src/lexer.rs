@@ -93,6 +93,10 @@ impl<'a> Iterator for Lexer<'a> {
                 }
                 token_literal = token_type.literal();
             }
+            '"' => {
+                token_literal = self.read_string();
+                token_type = TokenType::String;
+            }
             c if c.is_numeric() => {
                 token_type = TokenType::Int;
                 token_literal = self.read_number(c).to_string();
@@ -125,8 +129,15 @@ impl<'a> Lexer<'a> {
         }
     }
 
-    pub fn read_char(&mut self) {
-        self.chars.next();
+    pub fn read_string(&mut self) -> String {
+        let mut result = String::new();
+        while let Some(c) = self.chars.next() {
+            if c == '"' {
+                break;
+            }
+            result.push(c);
+        }
+        result
     }
 
     fn skip_whitespace(&mut self) {
@@ -318,7 +329,7 @@ let result = add(five, ten);
 
     #[test]
     fn test_next_token_4() {
-        let input = "let five = 5;
+        let input = r#"let five = 5;
 let ten = 10;
 
 let add = fn(x, y) {
@@ -333,7 +344,13 @@ if (5 < 10) {
     return true;
 } else {
     return false;
-}";
+}
+
+10 == 10;
+10 != 9;
+"foobar"
+"foo bar"
+"#;
         let tokens = Lexer::new(input).into_iter().collect::<Vec<Token>>();
         let expected = vec![
             Token { token_type: TokenType::Let, literal: TokenType::Let.literal() },
@@ -404,6 +421,20 @@ if (5 < 10) {
             Token { token_type: TokenType::False, literal: TokenType::False.literal() },
             Token { token_type: TokenType::Semicolon, literal: TokenType::Semicolon.literal() },
             Token { token_type: TokenType::Rbrace, literal: TokenType::Rbrace.literal() },
+
+            // 10 == 10
+            Token { token_type: TokenType::Int, literal: "10".to_string() },
+            Token { token_type: TokenType::Equal, literal: TokenType::Equal.literal() },
+            Token { token_type: TokenType::Int, literal: "10".to_string() },
+            Token { token_type: TokenType::Semicolon, literal: TokenType::Semicolon.literal() },
+            Token { token_type: TokenType::Int, literal: "10".to_string() },
+            Token { token_type: TokenType::NotEqual, literal: TokenType::NotEqual.literal() },
+            Token { token_type: TokenType::Int, literal: "9".to_string() },
+            Token { token_type: TokenType::Semicolon, literal: TokenType::Semicolon.literal() },
+
+            // string
+            Token { token_type: TokenType::String, literal: "foobar".to_string() },
+            Token { token_type: TokenType::String, literal: "foo bar".to_string() },
         ];
 
         assert_eq!(tokens, expected);

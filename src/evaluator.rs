@@ -201,6 +201,9 @@ impl Evaluator {
                     _ => Some(Object::Error(format!("not a function: {}", function))),
                 }
             }
+            Expression::String(s) => {
+                Some(Object::String(s.value.clone()))
+            }
             /*
                         Expression::Return => todo!(),
                         Expression::Assign => todo!(),
@@ -648,5 +651,16 @@ let addTwo = newAdder(2);
 addTwo(2);";
 
         test_integer_object(test_eval(input).unwrap(), 4);
+    }
+
+    #[test]
+    fn test_string_literal() {
+        let input = "\"Hello World!\"";
+        let evaluated = test_eval(input).unwrap();
+        if let Object::String(s) = evaluated {
+            assert_eq!("Hello World!", s);
+        } else {
+            panic!("object is not String. got {}", evaluated);
+        }
     }
 }

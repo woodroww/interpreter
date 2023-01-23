@@ -24,6 +24,7 @@ pub enum TokenType {
     // Identifiers + literals
     Ident,
     Int,
+    String,
 
     // Operators
     Assign,
@@ -123,6 +124,7 @@ impl TokenType {
             TokenType::If => "if".to_string(),
             TokenType::Else => "else".to_string(),
             TokenType::Return => "return".to_string(),
+            TokenType::String => "".to_string(),
         }
     }
 
@@ -154,6 +156,7 @@ impl TokenType {
             TokenType::If => "IF",
             TokenType::Else => "ELSE",
             TokenType::Return => "RETURN",
+            TokenType::String => "STRING",
         }
     }
 }
