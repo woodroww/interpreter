@@ -1,15 +1,21 @@
 use std::{cell::RefCell, rc::Rc};
 
 use crate::{
-    ast::{BlockStatement, Expression, Program, StatementType},
+    ast::{BlockStatement, Expression, Program, StatementType, Identifier},
     environment::Environment,
-    object::{FunctionObject, Object},
-    token::TokenType,
+    object::{FunctionObject, Object, BuiltinObject},
+    token::TokenType, builtins::Builtins,
 };
 
-pub struct Evaluator;
+pub struct Evaluator {
+    builtins: Builtins,
+}
 
 impl Evaluator {
+
+    pub fn new() -> Self {
+        Self { builtins: Builtins::new() }
+    }
 
     fn eval_statement(
         &mut self,
@@ -157,23 +163,7 @@ impl Evaluator {
                 }
             }
             Expression::Identifier(ident) => {
-                let value = env.borrow().get(ident.token.literal.clone()).clone();
-                match value {
-                    Some(obj) => {
-                        if let Object::Error(_) = obj {
-                            return Some(Object::new_error(&format!(
-                                "(Some error) identifier not found: {}",
-                                ident.token.literal.clone()
-                            )));
-                        } else {
-                            Some(obj)
-                        }
-                    }
-                    None => Some(Object::new_error(&format!(
-                        "(None error) identifier not found: {}",
-                        ident.token.literal.clone()
-                    ))),
-                }
+                self.eval_identifier(ident, env)
             }
             Expression::FunctionLiteral(function_literal) => {
                 let obj = FunctionObject {
@@ -196,29 +186,36 @@ impl Evaluator {
                         return Some(args[0].clone());
                     }
                 }
-                match function {
-                    Object::Function(f) => self.apply_function(f, args),
+                match &function {
+                    Object::Function(_) | Object::Builtin(_) => self.apply_function(function, args),
                     _ => Some(Object::Error(format!("not a function: {}", function))),
                 }
             }
             Expression::String(s) => {
                 Some(Object::String(s.value.clone()))
             }
-            /*
-                        Expression::Return => todo!(),
-                        Expression::Assign => todo!(),
-            */
-            _ => None,
+            Expression::Return => todo!(),
+            Expression::Assign => todo!(),
         }
     }
 
-    fn apply_function(&mut self, function: FunctionObject, args: Vec<Object>) -> Option<Object> {
-        let extended_env = self.extend_function_env(&function, &args);
-        let evaluated = self.eval_block_statement(
-            function.body.as_ref().unwrap(),
-            Rc::new(RefCell::new(extended_env)),
-        );
-        Some(self.unwrap_return_value(evaluated.unwrap()))
+    fn apply_function(&mut self, obj: Object, args: Vec<Object>) -> Option<Object> {
+        match obj {
+            Object::Function(function) => {
+                let extended_env = self.extend_function_env(&function, &args);
+                let evaluated = self.eval_block_statement(
+                    function.body.as_ref().unwrap(),
+                    Rc::new(RefCell::new(extended_env)),
+                );
+                Some(self.unwrap_return_value(evaluated.unwrap()))
+            }
+            Object::Builtin(builtin_obj) => {
+                (builtin_obj.function)(args)
+            }
+            _ => {
+                Some(Object::Error(format!("not a function {}", obj)))
+            }
+        }
     }
 
     fn extend_function_env(
@@ -238,6 +235,38 @@ impl Evaluator {
             *value
         } else {
             obj
+        }
+    }
+
+    fn eval_identifier(&mut self, ident: &Identifier, env: Rc<RefCell<Environment>>) -> Option<Object> {
+        let ident = ident.token.literal.clone();
+        let value = env.borrow().get(&ident).clone();
+        match value {
+            Some(obj) => {
+                if let Object::Error(_) = obj {
+                    return Some(Object::new_error(&format!(
+                        "identifier not found: {}",
+                        ident
+                    )));
+                } else {
+                    Some(obj)
+                }
+            }
+            None => {
+                let function = self.builtins.get(&ident);
+                match function {
+                    Some(function) => {
+                        Some(Object::Builtin(BuiltinObject::new(*function)))
+                    }
+                    None => {
+                        Some(Object::new_error(&format!(
+                            "identifier not found: {}",
+                            ident
+                        )))
+                    }
+                }
+
+            }
         }
     }
 
@@ -266,6 +295,9 @@ impl Evaluator {
         match (&left, &right) {
             (Object::Integer(a), Object::Integer(b)) => {
                 return self.eval_integer_infix_expression(operator, *a, *b);
+            }
+            (Object::String(a), Object::String(b)) => {
+                return self.eval_string_infix_expression(operator, a, b);
             }
             (_, _) => {}
         }
@@ -306,6 +338,20 @@ impl Evaluator {
                 "unknown operator {} {} {}",
                 left, token, right
             ))),
+        }
+    }
+
+    fn eval_string_infix_expression(
+        &self,
+        token: TokenType,
+        left: &str,
+        right: &str,
+    ) -> Option<Object> {
+        if token != TokenType::Plus {
+            Some(Object::Error(format!("unknown operator: {} {} {}", left, token, right)))
+        } else {
+            let result = left.to_owned() + right;
+            Some(Object::String(result))
         }
     }
 
@@ -394,7 +440,7 @@ mod test {
     fn test_eval(input: &str) -> Option<Object> {
         let mut parser = Parser::new(Lexer::new(input));
         let program = parser.parse_program();
-        let mut evaluator = Evaluator;
+        let mut evaluator = Evaluator::new();
         let env = Environment::new();
         evaluator.eval_program(&program.unwrap(), Rc::new(RefCell::new(env)))
     }
@@ -566,6 +612,7 @@ mod test {
 ",
                 "unknown operator: BOOLEAN + BOOLEAN",
             ),
+            (r#""Hello" - "World""#, "unknown operator: STRING - STRING"),
         ];
 
         for test in tests {
@@ -661,6 +708,50 @@ addTwo(2);";
             assert_eq!("Hello World!", s);
         } else {
             panic!("object is not String. got {}", evaluated);
+        }
+    }
+
+    #[test]
+    fn test_string_concatenation() {
+        let input = r#""Hello" + " " + "World!""#;
+        let evaluated = test_eval(input).unwrap();
+
+        if let Object::String(s) = evaluated {
+            assert_eq!("Hello World!", s);
+        } else {
+            panic!("object is not String. got {}", evaluated);
+        }
+    }
+
+    #[test]
+    fn test_builtin_functions() {
+        let tests = vec![
+            (r#"len("")"#, 0),
+            (r#"len("four")"#, 4),
+            (r#"len("hello world")"#, 11),
+        ];
+        let error_tests = vec![
+            (r#"len(1)"#, "argument to `len` not supported, got INTEGER"),
+            (r#"len("one", "two")"#, "wrong number of arguments. got 2, expected 1"),
+        ];
+
+        for test in tests {
+            let evaluated = test_eval(test.0).unwrap();
+            match evaluated {
+                Object::Integer(_n) => test_integer_object(evaluated, test.1),
+                _ => panic!("not an integer, got '{}'", evaluated)
+            }
+        }
+        for test in error_tests {
+            let evaluated = test_eval(test.0).unwrap();
+            match evaluated {
+                Object::Error(err) => {
+                    if err != test.1 {
+                        panic!("wrong error message. expected '{}', got '{}'", test.1, err);
+                    }
+                },
+                _ => panic!("not a error object. got {}", evaluated),
+            }
         }
     }
 }

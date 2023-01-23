@@ -39,7 +39,7 @@ fn main() -> io::Result<()> {
 }
 
 fn start() -> io::Result<()> {
-    let mut evaluator = Evaluator;
+    let mut evaluator = Evaluator::new();
     let env = Rc::new(RefCell::new(Environment::new()));
     println!("{}", MONKEY_FACE);
     loop {
@@ -123,5 +123,17 @@ applyFunc(2, 2, add);
 4
 applyFunc(10, 2, sub);
 8
+
+// -------------------------------------------------------------------------------------
+// Strings and concat
+// -------------------------------------------------------------------------------------
+
+>> let makeGreeter = fn(greeting) { fn(name) { greeting + " " + name + "!" } };
+>> let hello = makeGreeter("Hello");
+>> hello("Thorsten");
+Hello Thorsten!
+>> let heythere = makeGreeter("Hey there");
+>> heythere("Thorsten");
+Hey there Thorsten!
 
 */

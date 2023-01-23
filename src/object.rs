@@ -1,6 +1,6 @@
 use std::{cell::RefCell, rc::Rc};
 
-use crate::{environment::Environment, ast::{BlockStatement, Identifier}};
+use crate::{environment::Environment, ast::{BlockStatement, Identifier}, builtins::BuiltinFn};
 
 #[derive(Eq, PartialEq, Debug, Clone)]
 pub enum Object {
@@ -10,6 +10,7 @@ pub enum Object {
     Error(String),
     Function(FunctionObject),
     String(String),
+    Builtin(BuiltinObject),
     Null,
 }
 
@@ -26,6 +27,7 @@ impl std::fmt::Display for Object {
             Object::Error(err) => write!(f, "error {}", err),
             Object::Function(function) => write!(f, "{}", function),
             Object::String(s) => write!(f, "{}", s),
+            Object::Builtin(builtin) => write!(f, "{}", builtin),
         }
     }
 }
@@ -33,6 +35,19 @@ impl std::fmt::Display for Object {
 impl Object {
     pub fn new_error(error_string: &str) -> Object {
         Self::Error(error_string.to_string())
+    }
+
+    pub fn type_string(&self) -> String {
+        match self {
+            Object::Integer(_) => "INTEGER",
+            Object::Boolean(_) => "BOOL",
+            Object::Return(_) => "RETURN",
+            Object::Error(_) => "ERROR",
+            Object::Function(_) => "FUNCTION",
+            Object::String(_) => "STRING",
+            Object::Builtin(_) => "BUILTIN",
+            Object::Null => "NULL",
+        }.to_string()
     }
 }
 
@@ -63,6 +78,24 @@ impl std::fmt::Display for FunctionObject {
     }
 }
 
+#[derive(Eq, PartialEq, Debug, Clone)]
+pub struct BuiltinObject {
+    pub function: BuiltinFn,
+}
+
+impl BuiltinObject {
+    pub fn new(function: BuiltinFn) -> Self {
+        Self {
+            function
+        }
+    }
+}
+
+impl std::fmt::Display for BuiltinObject {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "builtin")
+    }
+}
 
 
 

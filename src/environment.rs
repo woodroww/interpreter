@@ -17,8 +17,8 @@ impl Environment {
         self
     }
 
-    pub fn get(&self, name: String) -> Option<Object> {
-        let obj = self.store.get(&name);
+    pub fn get(&self, name: &str) -> Option<Object> {
+        let obj = self.store.get(name);
         if obj.is_none() && self.outer.is_some() {
             let outer = self.outer.as_ref().unwrap().borrow();
             outer.get(name)
