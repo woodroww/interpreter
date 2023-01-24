@@ -1,10 +1,11 @@
 use std::{cell::RefCell, rc::Rc};
 
 use crate::{
-    ast::{BlockStatement, Expression, Program, StatementType, Identifier},
+    ast::{BlockStatement, Expression, Identifier, Program, StatementType},
+    builtins::Builtins,
     environment::Environment,
-    object::{FunctionObject, Object, BuiltinObject, ArrayObject},
-    token::TokenType, builtins::Builtins,
+    object::{ArrayObject, BuiltinObject, FunctionObject, Object},
+    token::TokenType,
 };
 
 pub struct Evaluator {
@@ -12,9 +13,10 @@ pub struct Evaluator {
 }
 
 impl Evaluator {
-
     pub fn new() -> Self {
-        Self { builtins: Builtins::new() }
+        Self {
+            builtins: Builtins::new(),
+        }
     }
 
     fn eval_statement(
@@ -162,9 +164,7 @@ impl Evaluator {
                     Some(Object::Null)
                 }
             }
-            Expression::Identifier(ident) => {
-                self.eval_identifier(ident, env)
-            }
+            Expression::Identifier(ident) => self.eval_identifier(ident, env),
             Expression::FunctionLiteral(function_literal) => {
                 let obj = FunctionObject {
                     parameters: function_literal.parameters.clone(),
@@ -191,9 +191,7 @@ impl Evaluator {
                     _ => Some(Object::Error(format!("not a function: {}", function))),
                 }
             }
-            Expression::String(s) => {
-                Some(Object::String(s.value.clone()))
-            }
+            Expression::String(s) => Some(Object::String(s.value.clone())),
             Expression::Return => todo!(),
             Expression::Assign => todo!(),
             Expression::ArrayLiteral(array) => {
@@ -205,7 +203,37 @@ impl Evaluator {
                 }
                 Some(Object::Array(ArrayObject::new(elements)))
             }
-            Expression::IndexExpression(_) => todo!(),
+            Expression::IndexExpression(node) => {
+                let left = self.eval_expression(&node.left.as_ref().unwrap(), Rc::clone(&env)).unwrap();
+                if let Object::Error(_) = left {
+                    return Some(left);
+                }
+                let index = self.eval_expression(&node.index.as_ref().unwrap(), env).unwrap();
+                if let Object::Error(_) = index {
+                    return Some(index);
+                }
+                self.eval_index_expression(left, index)
+            }
+        }
+    }
+
+    fn eval_index_expression(&mut self, left: Object, index: Object) -> Option<Object> {
+        match (&left, &index) {
+            (Object::Array(a), Object::Integer(b)) => {
+                self.eval_array_index_expression(a, *b)
+            }
+            _ => {
+                Some(Object::Error(format!("index operator not supported: {}", left)))
+            }
+        }
+    }
+
+    fn eval_array_index_expression(&self, array: &ArrayObject, index: isize) -> Option<Object> {
+        if index < 0 || index > (array.elements.len() - 1) as isize {
+            //Some(Object::Error("index out of bounds error".to_string()))
+            Some(Object::Null)
+        } else {
+            Some(array.elements[index as usize].clone())
         }
     }
 
@@ -219,12 +247,8 @@ impl Evaluator {
                 );
                 Some(self.unwrap_return_value(evaluated.unwrap()))
             }
-            Object::Builtin(builtin_obj) => {
-                (builtin_obj.function)(args)
-            }
-            _ => {
-                Some(Object::Error(format!("not a function {}", obj)))
-            }
+            Object::Builtin(builtin_obj) => (builtin_obj.function)(args),
+            _ => Some(Object::Error(format!("not a function {}", obj))),
         }
     }
 
@@ -248,7 +272,11 @@ impl Evaluator {
         }
     }
 
-    fn eval_identifier(&mut self, ident: &Identifier, env: Rc<RefCell<Environment>>) -> Option<Object> {
+    fn eval_identifier(
+        &mut self,
+        ident: &Identifier,
+        env: Rc<RefCell<Environment>>,
+    ) -> Option<Object> {
         let ident = ident.token.literal.clone();
         let value = env.borrow().get(&ident).clone();
         match value {
@@ -265,17 +293,12 @@ impl Evaluator {
             None => {
                 let function = self.builtins.get(&ident);
                 match function {
-                    Some(function) => {
-                        Some(Object::Builtin(BuiltinObject::new(*function)))
-                    }
-                    None => {
-                        Some(Object::new_error(&format!(
-                            "identifier not found: {}",
-                            ident
-                        )))
-                    }
+                    Some(function) => Some(Object::Builtin(BuiltinObject::new(*function))),
+                    None => Some(Object::new_error(&format!(
+                        "identifier not found: {}",
+                        ident
+                    ))),
                 }
-
             }
         }
     }
@@ -358,7 +381,10 @@ impl Evaluator {
         right: &str,
     ) -> Option<Object> {
         if token != TokenType::Plus {
-            Some(Object::Error(format!("unknown operator: {} {} {}", left, token, right)))
+            Some(Object::Error(format!(
+                "unknown operator: {} {} {}",
+                left, token, right
+            )))
         } else {
             let result = left.to_owned() + right;
             Some(Object::String(result))
@@ -742,14 +768,17 @@ addTwo(2);";
         ];
         let error_tests = vec![
             (r#"len(1)"#, "argument to `len` not supported, got INTEGER"),
-            (r#"len("one", "two")"#, "wrong number of arguments. got 2, expected 1"),
+            (
+                r#"len("one", "two")"#,
+                "wrong number of arguments. got 2, expected 1",
+            ),
         ];
 
         for test in tests {
             let evaluated = test_eval(test.0).unwrap();
             match evaluated {
                 Object::Integer(_n) => test_integer_object(&evaluated, test.1),
-                _ => panic!("not an integer, got '{}'", evaluated)
+                _ => panic!("not an integer, got '{}'", evaluated),
             }
         }
         for test in error_tests {
@@ -759,7 +788,7 @@ addTwo(2);";
                     if err != test.1 {
                         panic!("wrong error message. expected '{}', got '{}'", test.1, err);
                     }
-                },
+                }
                 _ => panic!("not a error object. got {}", evaluated),
             }
         }
@@ -777,6 +806,65 @@ addTwo(2);";
             test_integer_object(&obj.elements[2], 6);
         } else {
             panic!("object is not Array. got {}", evaluated);
+        }
+    }
+
+    #[test]
+    #[rustfmt::skip]
+    fn test_array_index_expressions() {
+        let inputs = vec![
+        (
+            "[1, 2, 3][0]",
+            Object::Integer(1),
+        ),
+        (
+            "[1, 2, 3][1]",
+            Object::Integer(2),
+        ),
+        (
+            "[1, 2, 3][2]",
+            Object::Integer(3),
+        ),
+        (
+            "let i = 0; [1][i];",
+            Object::Integer(1),
+        ),
+        (
+            "[1, 2, 3][1 + 1];",
+            Object::Integer(3),
+        ),
+        (
+            "let myArray = [1, 2, 3]; myArray[2];",
+            Object::Integer(3),
+        ),
+        (
+            "let myArray = [1, 2, 3]; myArray[0] + myArray[1] + myArray[2];",
+            Object::Integer(6),
+        ),
+        (
+            "let myArray = [1, 2, 3]; let i = myArray[0]; myArray[i]",
+            Object::Integer(2),
+        ),
+        (
+            "[1, 2, 3][3]",
+            Object::Null,
+        ),
+        (
+            "[1, 2, 3][-1]",
+            Object::Null,
+        ),
+    ];
+        for (input, expected) in inputs {
+            let evaluated = test_eval(input).unwrap();
+            match expected {
+                Object::Null => {
+                    assert_eq!(evaluated, Object::Null);
+                }
+                Object::Integer(n) => {
+                    test_integer_object(&evaluated, n);
+                }
+                _ => panic!("not integer or null"),
+            }
         }
 
     }

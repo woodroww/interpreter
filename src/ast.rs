@@ -650,8 +650,8 @@ impl ArrayLiteral {
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct IndexExpression {
     token: Token,
-    left: Option<Box<Expression>>,
-    index: Option<Box<Expression>>,
+    pub left: Option<Box<Expression>>,
+    pub index: Option<Box<Expression>>,
 }
 
 impl std::fmt::Display for IndexExpression {
