@@ -196,6 +196,7 @@ impl Evaluator {
             }
             Expression::Return => todo!(),
             Expression::Assign => todo!(),
+            Expression::ArrayLiteral(_) => todo!(),
         }
     }
 

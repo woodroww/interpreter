@@ -175,6 +175,7 @@ pub enum Expression {
     FunctionLiteral(FunctionLiteralExpression),
     Call(CallExpression),
     String(StringLiteral),
+    ArrayLiteral(ArrayLiteral),
 }
 
 impl std::fmt::Display for Expression {
@@ -191,6 +192,7 @@ impl std::fmt::Display for Expression {
             Expression::FunctionLiteral(function_literal) => write!(f, "{}", function_literal),
             Expression::Call(c) => write!(f, "{}", c),
             Expression::String(s) => write!(f, "{}", s),
+            Expression::ArrayLiteral(a) => write!(f, "{}", a),
         }
     }
 }
@@ -583,6 +585,10 @@ impl std::fmt::Display for FunctionLiteralExpression {
     }
 }
 
+// -----------------------------------------------------------------------------
+//  FunctionLiteral
+// -----------------------------------------------------------------------------
+
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct StringLiteral {
     token: Token,
@@ -603,6 +609,41 @@ impl StringLiteral {
         }
     }
 }
+
+// -----------------------------------------------------------------------------
+//  FunctionLiteral
+// -----------------------------------------------------------------------------
+
+#[derive(Debug, PartialEq, Eq, Clone)]
+pub struct ArrayLiteral {
+    token: Token,
+    pub elements: Vec<Expression>,
+}
+
+impl std::fmt::Display for ArrayLiteral {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let element_string = self
+            .elements
+            .iter()
+            .map(|e| format!("{}", e))
+            .collect::<Vec<String>>()
+            .join(", ");
+        write!(f, "[{}]", element_string)
+    }
+}
+
+impl ArrayLiteral {
+    pub fn new(token: Token) -> Self {
+        Self {
+            token,
+            elements: Vec::new()
+        }
+    }
+}
+
+// -----------------------------------------------------------------------------
+//  tests
+// -----------------------------------------------------------------------------
 
 #[cfg(test)]
 mod test {
