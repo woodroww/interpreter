@@ -11,6 +11,7 @@ pub enum Object {
     Function(FunctionObject),
     String(String),
     Builtin(BuiltinObject),
+    Array(ArrayObject),
     Null,
 }
 
@@ -28,6 +29,7 @@ impl std::fmt::Display for Object {
             Object::Function(function) => write!(f, "{}", function),
             Object::String(s) => write!(f, "{}", s),
             Object::Builtin(builtin) => write!(f, "{}", builtin),
+            Object::Array(array) => write!(f, "{}", array),
         }
     }
 }
@@ -47,6 +49,7 @@ impl Object {
             Object::String(_) => "STRING",
             Object::Builtin(_) => "BUILTIN",
             Object::Null => "NULL",
+            Object::Array(_) => "ARRAY",
         }.to_string()
     }
 }
@@ -96,6 +99,33 @@ impl std::fmt::Display for BuiltinObject {
         write!(f, "builtin")
     }
 }
+
+#[derive(Eq, PartialEq, Debug, Clone)]
+pub struct ArrayObject {
+    pub elements: Vec<Object>,
+}
+
+impl ArrayObject {
+    pub fn new(elements: Vec<Object>) -> Self {
+        Self {
+            elements
+        }
+    }
+}
+
+impl std::fmt::Display for ArrayObject {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let objects = self
+            .elements
+            .iter()
+            .map(|obj| format!("{}", obj))
+            .collect::<Vec<String>>()
+            .join(", ");
+        write!(f, "[{}]", objects)
+    }
+}
+
+
 
 
 

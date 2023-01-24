@@ -3,7 +3,7 @@ use std::{cell::RefCell, rc::Rc};
 use crate::{
     ast::{BlockStatement, Expression, Program, StatementType, Identifier},
     environment::Environment,
-    object::{FunctionObject, Object, BuiltinObject},
+    object::{FunctionObject, Object, BuiltinObject, ArrayObject},
     token::TokenType, builtins::Builtins,
 };
 
@@ -196,7 +196,15 @@ impl Evaluator {
             }
             Expression::Return => todo!(),
             Expression::Assign => todo!(),
-            Expression::ArrayLiteral(_) => todo!(),
+            Expression::ArrayLiteral(array) => {
+                let elements = self.eval_expressions(&array.elements, env);
+                if elements.len() == 1 {
+                    if let Object::Error(_) = &elements[0] {
+                        return Some(elements[0].clone());
+                    }
+                }
+                Some(Object::Array(ArrayObject::new(elements)))
+            }
             Expression::IndexExpression(_) => todo!(),
         }
     }
@@ -447,9 +455,9 @@ mod test {
         evaluator.eval_program(&program.unwrap(), Rc::new(RefCell::new(env)))
     }
 
-    fn test_integer_object(obj: Object, expected: isize) {
+    fn test_integer_object(obj: &Object, expected: isize) {
         match obj {
-            Object::Integer(n) => assert_eq!(n, expected),
+            Object::Integer(n) => assert_eq!(n, &expected),
             _ => panic!("expected integer, got {}", obj),
         }
     }
@@ -529,7 +537,7 @@ mod test {
         ];
         for test in tests {
             let evaluated = test_eval(test.0);
-            test_integer_object(evaluated.unwrap(), test.1);
+            test_integer_object(&evaluated.unwrap(), test.1);
         }
     }
 
@@ -549,7 +557,7 @@ mod test {
             let evaluated = test_eval(test.0);
             match evaluated {
                 Some(obj) => match test.1 {
-                    Some(n) => test_integer_object(obj, n),
+                    Some(n) => test_integer_object(&obj, n),
                     None => {
                         assert_eq!(obj, Object::Null);
                         println!("got evaluated to Object::Null");
@@ -585,7 +593,7 @@ mod test {
         for test in tests {
             let evaluated = test_eval(test.0);
             match evaluated {
-                Some(obj) => test_integer_object(obj, test.1),
+                Some(obj) => test_integer_object(&obj, test.1),
                 None => panic!("didn't evaluate to anything"),
             }
         }
@@ -642,7 +650,7 @@ mod test {
         ];
 
         for test in tests {
-            test_integer_object(test_eval(test.0).unwrap(), test.1);
+            test_integer_object(&test_eval(test.0).unwrap(), test.1);
         }
     }
 
@@ -686,7 +694,7 @@ mod test {
         ];
 
         for test in tests {
-            test_integer_object(test_eval(test.0).unwrap(), test.1);
+            test_integer_object(&test_eval(test.0).unwrap(), test.1);
         }
     }
 
@@ -699,7 +707,7 @@ let newAdder = fn(x) {
 let addTwo = newAdder(2);
 addTwo(2);";
 
-        test_integer_object(test_eval(input).unwrap(), 4);
+        test_integer_object(&test_eval(input).unwrap(), 4);
     }
 
     #[test]
@@ -740,7 +748,7 @@ addTwo(2);";
         for test in tests {
             let evaluated = test_eval(test.0).unwrap();
             match evaluated {
-                Object::Integer(_n) => test_integer_object(evaluated, test.1),
+                Object::Integer(_n) => test_integer_object(&evaluated, test.1),
                 _ => panic!("not an integer, got '{}'", evaluated)
             }
         }
@@ -755,5 +763,21 @@ addTwo(2);";
                 _ => panic!("not a error object. got {}", evaluated),
             }
         }
+    }
+
+    #[test]
+    fn test_array_literals() {
+        let input = "[1, 2 * 2, 3 + 3]";
+        let evaluated = test_eval(input).unwrap();
+
+        if let Object::Array(obj) = evaluated {
+            assert_eq!(obj.elements.len(), 3);
+            test_integer_object(&obj.elements[0], 1);
+            test_integer_object(&obj.elements[1], 4);
+            test_integer_object(&obj.elements[2], 6);
+        } else {
+            panic!("object is not Array. got {}", evaluated);
+        }
+
     }
 }
