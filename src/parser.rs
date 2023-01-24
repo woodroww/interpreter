@@ -3,13 +3,15 @@ use std::collections::HashMap;
 use crate::{
     ast::{
         ArrayLiteral, BlockStatement, BooleanExpression, CallExpression, Expression,
-        ExpressionStatement, FunctionLiteralExpression, Identifier, IfExpression, InfixExpression,
-        LetStatement, PrefixExpression, Program, ReturnStatement, StatementType, StringLiteral,
+        ExpressionStatement, FunctionLiteralExpression, Identifier, IfExpression, IndexExpression,
+        InfixExpression, LetStatement, PrefixExpression, Program, ReturnStatement, StatementType,
+        StringLiteral,
     },
     lexer::Lexer,
     token::{Token, TokenType},
 };
 
+// the order here matters
 #[derive(Clone, Copy)]
 pub enum Precedence {
     Lowest,
@@ -19,6 +21,7 @@ pub enum Precedence {
     Product,     // *
     Prefix,      // -X or !X
     Call,        // myFunction(X)
+    Index,       // myArray[X]
 }
 
 pub struct Parser<'a> {
@@ -86,6 +89,23 @@ fn parse_call_expression(parser: &mut Parser, left: Expression) -> Option<Expres
         expression.arguments = args.unwrap();
     }
     Some(Expression::Call(expression))
+}
+
+fn parse_index_expression(parser: &mut Parser, left: Expression) -> Option<Expression> {
+    let mut expression = IndexExpression::new(parser.current_clone()).with_left(left);
+    parser.next_token();
+    let index_expression = parser.parse_expression(Precedence::Lowest);
+    if index_expression.is_some() {
+        expression.set_index(index_expression.unwrap());
+    } else {
+        panic!("so why didn't we get an index expression");
+    }
+
+    if !parser.expect_peek(&TokenType::Rbracket) {
+        None
+    } else {
+        Some(Expression::IndexExpression(expression))
+    }
 }
 
 fn parse_grouped_expression(parser: &mut Parser) -> Option<Expression> {
@@ -185,6 +205,7 @@ impl<'a> Parser<'a> {
             (TokenType::Slash, Precedence::Product),
             (TokenType::Asterisk, Precedence::Product),
             (TokenType::Lparen, Precedence::Call),
+            (TokenType::Lbracket, Precedence::Index),
         ]);
         let mut parser = Self {
             lexer,
@@ -219,6 +240,7 @@ impl<'a> Parser<'a> {
         parser.register_infix(TokenType::LessThan, parse_infix_expression);
         parser.register_infix(TokenType::GreaterThan, parse_infix_expression);
         parser.register_infix(TokenType::Lparen, parse_call_expression);
+        parser.register_infix(TokenType::Lbracket, parse_index_expression);
 
         parser
     }
@@ -513,7 +535,7 @@ impl<'a> Parser<'a> {
 mod test {
 
     use super::*;
-    use crate::ast::{ArrayLiteral, NodeInterface, StringLiteral};
+    use crate::ast::{ArrayLiteral, IndexExpression, NodeInterface, StringLiteral};
     use pretty_assertions::assert_eq;
 
     fn check_parser_errors(parser: &Parser) -> Option<String> {
@@ -923,63 +945,51 @@ return 993322;
     #[test]
     fn test_operator_precedence_parsing() {
         let inputs = vec![
-            "-a * b",
-            "!-a",
-            "a + b + c",
-            "a + b - c",
-            "a * b * c",
-            "a * b / c",
-            "a + b / c",
-            "a + b * c + d / e - f",
-            "3 + 4; -5 * 5",
-            "5 > 4 == 3 < 4",
-            "5 < 4 != 3 > 4",
-            "3 + 4 * 5 == 3 * 1 + 4 * 5",
-            "true",
-            "false",
-            "3 > 5 == false",
-            "3 < 5 == true",
-            "1 + (2 + 3) + 4",
-            "(5 + 5) * 2",
-            "2 / (5 + 5)",
-            "(5 + 5) * 2 * (5 + 5)",
-            "-(5 + 5)",
-            "!(true == true)",
-            "a + add(b * c) + d",
-            "add(a, b, 1, 2 * 3, 4 + 5, add(6, 7 * 8))",
-            "add(a + b + c * d / f + g)",
+            ("-a * b", "((-a) * b)"),
+            ("!-a", "(!(-a))"),
+            ("a + b + c", "((a + b) + c)"),
+            ("a + b - c", "((a + b) - c)"),
+            ("a * b * c", "((a * b) * c)"),
+            ("a * b / c", "((a * b) / c)"),
+            ("a + b / c", "(a + (b / c))"),
+            ("a + b * c + d / e - f", "(((a + (b * c)) + (d / e)) - f)"),
+            ("3 + 4; -5 * 5", "(3 + 4)((-5) * 5)"),
+            ("5 > 4 == 3 < 4", "((5 > 4) == (3 < 4))"),
+            ("5 < 4 != 3 > 4", "((5 < 4) != (3 > 4))"),
+            (
+                "3 + 4 * 5 == 3 * 1 + 4 * 5",
+                "((3 + (4 * 5)) == ((3 * 1) + (4 * 5)))",
+            ),
+            ("true", "true"),
+            ("false", "false"),
+            ("3 > 5 == false", "((3 > 5) == false)"),
+            ("3 < 5 == true", "((3 < 5) == true)"),
+            ("1 + (2 + 3) + 4", "((1 + (2 + 3)) + 4)"),
+            ("(5 + 5) * 2", "((5 + 5) * 2)"),
+            ("2 / (5 + 5)", "(2 / (5 + 5))"),
+            ("(5 + 5) * 2 * (5 + 5)", "(((5 + 5) * 2) * (5 + 5))"),
+            ("-(5 + 5)", "(-(5 + 5))"),
+            ("!(true == true)", "(!(true == true))"),
+            ("a + add(b * c) + d", "((a + add((b * c))) + d)"),
+            (
+                "add(a, b, 1, 2 * 3, 4 + 5, add(6, 7 * 8))",
+                "add(a, b, 1, (2 * 3), (4 + 5), add(6, (7 * 8)))",
+            ),
+            (
+                "add(a + b + c * d / f + g)",
+                "add((((a + b) + ((c * d) / f)) + g))",
+            ),
+            (
+                "a * [1, 2, 3, 4][b * c] * d",
+                "((a * ([1, 2, 3, 4][(b * c)])) * d)",
+            ),
+            (
+                "add(a * b[2], b[1], 2 * [1, 2][1])",
+                "add((a * (b[2])), (b[1]), (2 * ([1, 2][1])))",
+            ),
         ];
 
-        let expecteds = vec![
-            "((-a) * b)",
-            "(!(-a))",
-            "((a + b) + c)",
-            "((a + b) - c)",
-            "((a * b) * c)",
-            "((a * b) / c)",
-            "(a + (b / c))",
-            "(((a + (b * c)) + (d / e)) - f)",
-            "(3 + 4)((-5) * 5)",
-            "((5 > 4) == (3 < 4))",
-            "((5 < 4) != (3 > 4))",
-            "((3 + (4 * 5)) == ((3 * 1) + (4 * 5)))",
-            "true",
-            "false",
-            "((3 > 5) == false)",
-            "((3 < 5) == true)",
-            "((1 + (2 + 3)) + 4)",
-            "((5 + 5) * 2)",
-            "(2 / (5 + 5))",
-            "(((5 + 5) * 2) * (5 + 5))",
-            "(-(5 + 5))",
-            "(!(true == true))",
-            "((a + add((b * c))) + d)",
-            "add(a, b, 1, (2 * 3), (4 + 5), add(6, (7 * 8)))",
-            "add((((a + b) + ((c * d) / f)) + g))",
-        ];
-
-        for (input, expected) in inputs.into_iter().zip(expecteds) {
-            //println!("testing: {} == {}", input, expected);
+        for (input, expected) in inputs {
             let lexer = Lexer::new(input);
             let mut parser = Parser::new(lexer);
             let program = parser.parse_program().unwrap();
@@ -1291,16 +1301,46 @@ return 993322;
             .with_right(Expression::Int(2)),
         ));
         literal.elements.push(Expression::Infix(
-            InfixExpression::new(Token::new(
-                TokenType::Plus,
-                &TokenType::Plus.literal(),
-            ))
-            .with_left(Expression::Int(3))
-            .with_right(Expression::Int(3)),
+            InfixExpression::new(Token::new(TokenType::Plus, &TokenType::Plus.literal()))
+                .with_left(Expression::Int(3))
+                .with_right(Expression::Int(3)),
         ));
 
         let expected = StatementType::Expression(
             ExpressionStatement::new(token).with_expression(Expression::ArrayLiteral(literal)),
+        );
+        assert_eq!(statement, &expected);
+    }
+
+    #[test]
+    fn test_parsing_index_expressions() {
+        let input = "myArray[1 + 1]";
+        let lexer = Lexer::new(input);
+        let mut parser = Parser::new(lexer);
+        let program = parser.parse_program().unwrap();
+        let error_string = check_parser_errors(&parser);
+        if error_string.is_some() {
+            println!("{}", error_string.unwrap());
+        }
+        //assert_eq!(program.statements.len(), 1);
+        let statement = &program.statements[0];
+
+        let token = Token::new(TokenType::Ident, "myArray");
+        let left = Expression::Identifier(Identifier::new(token.clone()));
+        let index = Expression::Infix(
+            InfixExpression::new(Token::new(TokenType::Plus, &TokenType::Plus.literal()))
+                .with_left(Expression::Int(1))
+                .with_right(Expression::Int(1)),
+        );
+        let expected = StatementType::Expression(
+            ExpressionStatement::new(token.clone()).with_expression(Expression::IndexExpression(
+                IndexExpression::new(Token::new(
+                    TokenType::Lbracket,
+                    &TokenType::Lbracket.literal(),
+                ))
+                .with_left(left)
+                .with_index(index),
+            )),
         );
         assert_eq!(statement, &expected);
     }

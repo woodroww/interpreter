@@ -176,6 +176,7 @@ pub enum Expression {
     Call(CallExpression),
     String(StringLiteral),
     ArrayLiteral(ArrayLiteral),
+    IndexExpression(IndexExpression),
 }
 
 impl std::fmt::Display for Expression {
@@ -193,6 +194,7 @@ impl std::fmt::Display for Expression {
             Expression::Call(c) => write!(f, "{}", c),
             Expression::String(s) => write!(f, "{}", s),
             Expression::ArrayLiteral(a) => write!(f, "{}", a),
+            Expression::IndexExpression(e) => write!(f, "{}", e),
         }
     }
 }
@@ -638,6 +640,45 @@ impl ArrayLiteral {
             token,
             elements: Vec::new()
         }
+    }
+}
+
+// -----------------------------------------------------------------------------
+//  IndexExpression
+// -----------------------------------------------------------------------------
+
+#[derive(Debug, PartialEq, Eq, Clone)]
+pub struct IndexExpression {
+    token: Token,
+    left: Option<Box<Expression>>,
+    index: Option<Box<Expression>>,
+}
+
+impl std::fmt::Display for IndexExpression {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "({}[{}])", self.left.as_ref().unwrap(), self.index.as_ref().unwrap())
+    }
+}
+
+impl IndexExpression {
+    pub fn new(token: Token) -> Self {
+        Self {
+            token,
+            left: None,
+            index: None,
+        }
+    }
+    pub fn with_left(mut self, left: Expression) -> Self {
+        self.left = Some(Box::new(left));
+        self
+    }
+    pub fn with_index(mut self, index: Expression) -> Self {
+        self.index = Some(Box::new(index));
+        self
+    }
+
+    pub fn set_index(&mut self, index: Expression) {
+        self.index = Some(Box::new(index));
     }
 }
 
