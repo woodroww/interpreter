@@ -16,6 +16,7 @@ impl Builtins {
         map.insert("last".to_string(), last_builtin);
         map.insert("rest".to_string(), rest_builtin);
         map.insert("push".to_string(), push_builtin);
+        map.insert("puts".to_string(), puts_builtin);
         Self {
             builtins: map
         }
@@ -119,3 +120,11 @@ pub fn push_builtin(args: Vec<Object>) -> Option<Object> {
         }
     }
 }
+
+pub fn puts_builtin(args: Vec<Object>) -> Option<Object> {
+    for arg in args {
+        println!("{}", arg);
+    }
+    Some(Object::Null)
+}
+

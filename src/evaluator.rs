@@ -840,7 +840,7 @@ addTwo(2);";
             ),
         ];
         let null_tests = vec![
-            //(r#"puts("hello", "world!")"#, Object::Null),
+            (r#"puts("hello", "world!")"#, Object::Null),
             (r#"first([])"#, Object::Null),
             (r#"last([])"#, Object::Null),
             (r#"rest([])"#, Object::Null),
