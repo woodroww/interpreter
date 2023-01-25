@@ -1,7 +1,7 @@
-use std::{cell::RefCell, rc::Rc, collections::HashMap};
+use std::{cell::RefCell, collections::HashMap, rc::Rc};
 
 use crate::{
-    ast::{BlockStatement, Expression, Identifier, Program, StatementType, HashLiteral},
+    ast::{BlockStatement, Expression, HashLiteral, Identifier, Program, StatementType},
     builtins::Builtins,
     environment::Environment,
     object::{ArrayObject, BuiltinObject, FunctionObject, Object},
@@ -202,11 +202,15 @@ impl Evaluator {
                 Some(Object::Array(ArrayObject::new(elements)))
             }
             Expression::IndexExpression(node) => {
-                let left = self.eval_expression(&node.left.as_ref().unwrap(), Rc::clone(&env)).unwrap();
+                let left = self
+                    .eval_expression(&node.left.as_ref().unwrap(), Rc::clone(&env))
+                    .unwrap();
                 if let Object::Error(_) = left {
                     return Some(left);
                 }
-                let index = self.eval_expression(&node.index.as_ref().unwrap(), env).unwrap();
+                let index = self
+                    .eval_expression(&node.index.as_ref().unwrap(), env)
+                    .unwrap();
                 if let Object::Error(_) = index {
                     return Some(index);
                 }
@@ -218,7 +222,11 @@ impl Evaluator {
         }
     }
 
-    fn eval_hash_literal(&mut self, hash: &HashLiteral, env: Rc<RefCell<Environment>>) -> Option<Object> {
+    fn eval_hash_literal(
+        &mut self,
+        hash: &HashLiteral,
+        env: Rc<RefCell<Environment>>,
+    ) -> Option<Object> {
         let mut pairs = HashMap::new();
         for (key, value) in &hash.pairs {
             let key = self.eval_expression(key, env.clone()).unwrap();
@@ -236,12 +244,23 @@ impl Evaluator {
 
     fn eval_index_expression(&mut self, left: Object, index: Object) -> Option<Object> {
         match (&left, &index) {
-            (Object::Array(a), Object::Integer(b)) => {
-                self.eval_array_index_expression(a, *b)
-            }
-            _ => {
-                Some(Object::Error(format!("index operator not supported: {}", left)))
-            }
+            (Object::Array(a), Object::Integer(b)) => self.eval_array_index_expression(a, *b),
+            (Object::Hash(hash), index) => self.eval_hash_index_expression(hash, index),
+            _ => Some(Object::Error(format!(
+                "index operator not supported: {}",
+                left
+            ))),
+        }
+    }
+
+    fn eval_hash_index_expression(
+        &self,
+        hash: &HashMap<Object, Object>,
+        index: &Object,
+    ) -> Option<Object> {
+        match hash.get(index).cloned() {
+            Some(obj) => Some(obj),
+            None => Some(Object::Null),
         }
     }
 
@@ -489,7 +508,7 @@ mod test {
     use std::collections::{BTreeMap, HashMap};
 
     use super::*;
-    use crate::{lexer::Lexer, parser::Parser, ast::StringLiteral};
+    use crate::{ast::StringLiteral, lexer::Lexer, parser::Parser};
     use pretty_assertions::assert_eq;
 
     fn test_eval(input: &str) -> Option<Object> {
@@ -758,8 +777,7 @@ let ourFunction = fn(first) {
 
 ourFunction(20) + first + second;";
 
-	test_integer_object(&test_eval(input).unwrap(), 70);
-
+        test_integer_object(&test_eval(input).unwrap(), 70);
     }
 
     #[test]
@@ -809,8 +827,17 @@ addTwo(2);";
             (r#"last([1, 2, 3])"#, 3),
         ];
         let array_tests = vec![
-            (r#"rest([1, 2, 3])"#, Object::Array(ArrayObject::new(vec![Object::Integer(2), Object::Integer(3)]))),
-            (r#"push([], 1)"#, Object::Array(ArrayObject::new(vec![Object::Integer(1)]))),
+            (
+                r#"rest([1, 2, 3])"#,
+                Object::Array(ArrayObject::new(vec![
+                    Object::Integer(2),
+                    Object::Integer(3),
+                ])),
+            ),
+            (
+                r#"push([], 1)"#,
+                Object::Array(ArrayObject::new(vec![Object::Integer(1)])),
+            ),
         ];
         let null_tests = vec![
             //(r#"puts("hello", "world!")"#, Object::Null),
@@ -826,10 +853,22 @@ addTwo(2);";
                 "wrong number of arguments. got 2, expected 1",
             ),
             (r#"len(1)"#, "argument to `len` not supported, got INTEGER"),
-            (r#"len("one", "two")"#, "wrong number of arguments. got 2, expected 1"),
-            (r#"first(1)"#, "argument to `first` must be ARRAY, got INTEGER"),
-            (r#"last(1)"#, "argument to `last` must be ARRAY, got INTEGER"),
-            (r#"push(1, 1)"#, "argument to `push` must be ARRAY, got INTEGER"),
+            (
+                r#"len("one", "two")"#,
+                "wrong number of arguments. got 2, expected 1",
+            ),
+            (
+                r#"first(1)"#,
+                "argument to `first` must be ARRAY, got INTEGER",
+            ),
+            (
+                r#"last(1)"#,
+                "argument to `last` must be ARRAY, got INTEGER",
+            ),
+            (
+                r#"push(1, 1)"#,
+                "argument to `push` must be ARRAY, got INTEGER",
+            ),
         ];
 
         for test in tests {
@@ -940,7 +979,7 @@ addTwo(2);";
 
     #[test]
     fn test_hash_literals() {
-	    let input = r#"let two = "two";
+        let input = r#"let two = "two";
 {
     "one": 10 - 9,
     two: 1 + 1,
@@ -960,5 +999,22 @@ addTwo(2);";
 
         let expected = Object::Hash(map);
         assert_eq!(evaluated, expected);
+    }
+
+    #[test]
+    fn test_hash_index_expressions() {
+        let tests = vec![
+            (r#"{"foo": 5}["foo"]"#, Object::Integer(5)),
+            (r#"{"foo": 5}["bar"]"#, Object::Null),
+            (r#"let key = "foo"; {"foo": 5}[key]"#, Object::Integer(5)),
+            (r#"{}["foo"]"#, Object::Null),
+            (r#"{5: 5}[5]"#, Object::Integer(5)),
+            (r#"{true: 5}[true]"#, Object::Integer(5)),
+            (r#"{false: 5}[false]"#, Object::Integer(5)),
+        ];
+        for test in tests {
+            let evaluated = test_eval(test.0).unwrap();
+            assert_eq!(evaluated, test.1);
+        }
     }
 }
