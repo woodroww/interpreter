@@ -5,7 +5,7 @@ use crate::{
         ArrayLiteral, BlockStatement, BooleanExpression, CallExpression, Expression,
         ExpressionStatement, FunctionLiteralExpression, Identifier, IfExpression, IndexExpression,
         InfixExpression, LetStatement, PrefixExpression, Program, ReturnStatement, StatementType,
-        StringLiteral,
+        StringLiteral, HashLiteral,
     },
     lexer::Lexer,
     token::{Token, TokenType},
@@ -193,6 +193,33 @@ fn parse_array_literal(parser: &mut Parser) -> Option<Expression> {
     Some(Expression::ArrayLiteral(array))
 }
 
+fn parse_hash_literal(parser: &mut Parser) -> Option<Expression> {
+    let mut hash = HashLiteral::new(parser.current_clone());
+
+    while !parser.peek_token_is(&TokenType::Rbrace) {
+        parser.next_token();
+        let key = parser.parse_expression(Precedence::Lowest);
+        if !parser.expect_peek(&TokenType::Colon) {
+            return None;
+        }
+        parser.next_token();
+        let value = parser.parse_expression(Precedence::Lowest);
+
+        if key.is_none() | value.is_none() {
+            return None;
+        }
+        hash.pairs.insert(key.unwrap(), value.unwrap());
+
+        if !parser.peek_token_is(&TokenType::Rbrace) && !parser.expect_peek(&TokenType::Comma) {
+            return None;
+        }
+    }
+    if !parser.expect_peek(&TokenType::Rbrace) {
+        return None;
+    }
+    Some(Expression::Hash(hash))
+}
+
 impl<'a> Parser<'a> {
     pub fn new(lexer: Lexer<'a>) -> Self {
         let precedences = HashMap::from([
@@ -230,6 +257,7 @@ impl<'a> Parser<'a> {
         parser.register_prefix(TokenType::Function, parse_fn_literal);
         parser.register_prefix(TokenType::String, parse_string_literal);
         parser.register_prefix(TokenType::Lbracket, parse_array_literal);
+        parser.register_prefix(TokenType::Lbrace, parse_hash_literal);
 
         parser.register_infix(TokenType::Plus, parse_infix_expression);
         parser.register_infix(TokenType::Minus, parse_infix_expression);
@@ -246,7 +274,6 @@ impl<'a> Parser<'a> {
     }
 
     pub fn parse_program(&mut self) -> Option<Program> {
-        //println!("parse_program");
         let mut program: Program = Program::new();
         while let Some(_token) = &self.current_token {
             let statement = self.parse_statement();
@@ -259,7 +286,6 @@ impl<'a> Parser<'a> {
     }
 
     fn parse_statement(&mut self) -> Option<StatementType> {
-        //println!("parse_statement");
         if self.current_token.is_none() {
             return None;
         }
@@ -285,7 +311,6 @@ impl<'a> Parser<'a> {
     }
 
     fn parse_expression_statement(&mut self) -> Option<ExpressionStatement> {
-        //println!("parse_expression_statement");
         if self.current_token.is_none() {
             return None;
         }
@@ -301,8 +326,8 @@ impl<'a> Parser<'a> {
 
     // page 70
     fn parse_expression(&mut self, precedence: Precedence) -> Option<Expression> {
-        //println!("parse_expression");
         let token = self.current_clone();
+        //println!("parse_expression token {}", token);
         let mut left_exp = match self.prefix_fns.get(&token.token_type) {
             Some(prefix_fn) => prefix_fn(self),
             None => {
@@ -351,7 +376,6 @@ impl<'a> Parser<'a> {
             Some(token) => token,
             None => return Precedence::Lowest,
         };
-        //println!("peek_precedence: current: {}, peek: {}", self.current_clone(), peek);
         match self.precedences.get(&peek.token_type) {
             Some(precedence) => precedence.clone(),
             None => Precedence::Lowest,
@@ -507,7 +531,6 @@ impl<'a> Parser<'a> {
     }
 
     fn expect_peek(&mut self, token: &TokenType) -> bool {
-        //println!("expect_peek {}, expected: {}", self.peek_token.as_ref().unwrap(), token);
         if self.peek_token_is(&token) {
             self.next_token();
             true
@@ -534,8 +557,10 @@ impl<'a> Parser<'a> {
 #[cfg(test)]
 mod test {
 
+    use std::collections::BTreeMap;
+
     use super::*;
-    use crate::ast::{ArrayLiteral, IndexExpression, NodeInterface, StringLiteral};
+    use crate::ast::{ArrayLiteral, IndexExpression, NodeInterface, StringLiteral, HashLiteral};
     use pretty_assertions::assert_eq;
 
     fn check_parser_errors(parser: &Parser) -> Option<String> {
@@ -1344,4 +1369,133 @@ return 993322;
         );
         assert_eq!(statement, &expected);
     }
+
+    #[test]
+    fn test_parsing_hash_listeral_string_keys() {
+        let input = r#"{"one": 1, "two": 2, "three": 3}"#;
+        let lexer = Lexer::new(input);
+        let mut parser = Parser::new(lexer);
+        let program = parser.parse_program().unwrap();
+        let error_string = check_parser_errors(&parser);
+        if error_string.is_some() {
+            println!("{}", error_string.unwrap());
+        }
+        let statement = &program.statements[0];
+
+        let mut map: BTreeMap<Expression, Expression> = BTreeMap::new();
+        map.insert(Expression::String(StringLiteral::new("one")), Expression::Int(1));
+        map.insert(Expression::String(StringLiteral::new("two")), Expression::Int(2));
+        map.insert(Expression::String(StringLiteral::new("three")), Expression::Int(3));
+
+        let token = Token::new(TokenType::Lbrace, &TokenType::Lbrace.literal());
+        let expected = StatementType::Expression(
+            ExpressionStatement::new(token.clone())
+                .with_expression(Expression::Hash(HashLiteral::new(token).with_pairs(map)))
+        );
+        assert_eq!(statement, &expected);
+    }
+
+    #[test]
+    fn test_parsing_empty_hash_literal() {
+        let input = "{}";
+
+        let lexer = Lexer::new(input);
+        let mut parser = Parser::new(lexer);
+        let program = parser.parse_program().unwrap();
+        let error_string = check_parser_errors(&parser);
+        if error_string.is_some() {
+            println!("{}", error_string.unwrap());
+        }
+        let statement = &program.statements[0];
+
+        let token = Token::new(TokenType::Lbrace, &TokenType::Lbrace.literal());
+        let expected = StatementType::Expression(
+            ExpressionStatement::new(token.clone())
+                .with_expression(Expression::Hash(HashLiteral::new(token)))
+        );
+        assert_eq!(statement, &expected);
+    }
+
+    #[test]
+    fn test_parsing_hash_literals_boolean_keys() {
+        let input = "{true: 1, false: 2}";
+        let lexer = Lexer::new(input);
+        let mut parser = Parser::new(lexer);
+        let program = parser.parse_program().unwrap();
+        let error_string = check_parser_errors(&parser);
+        if error_string.is_some() {
+            println!("{}", error_string.unwrap());
+        }
+        let statement = &program.statements[0];
+
+        let token = Token::new(TokenType::Lbrace, &TokenType::Lbrace.literal());
+        let mut map: BTreeMap<Expression, Expression> = BTreeMap::new();
+        map.insert(Expression::Boolean(BooleanExpression::new(Token::new(TokenType::True, "true"))), Expression::Int(1));
+        map.insert(Expression::Boolean(BooleanExpression::new(Token::new(TokenType::False, "false"))), Expression::Int(2));
+        let expected = StatementType::Expression(
+            ExpressionStatement::new(token.clone())
+                .with_expression(Expression::Hash(HashLiteral::new(token).with_pairs(map)))
+        );
+        assert_eq!(statement, &expected);
+    }
+
+    #[test]
+    fn test_parsing_hash_literals_integer_keys() {
+        let input = "{1: 1, 2: 2, 3: 3}";
+        let lexer = Lexer::new(input);
+        let mut parser = Parser::new(lexer);
+        let program = parser.parse_program().unwrap();
+        let error_string = check_parser_errors(&parser);
+        if error_string.is_some() {
+            println!("{}", error_string.unwrap());
+        }
+        let statement = &program.statements[0];
+
+        let token = Token::new(TokenType::Lbrace, &TokenType::Lbrace.literal());
+        let mut map: BTreeMap<Expression, Expression> = BTreeMap::new();
+        map.insert(Expression::Int(1), Expression::Int(1));
+        map.insert(Expression::Int(2), Expression::Int(2));
+        map.insert(Expression::Int(3), Expression::Int(3));
+        let expected = StatementType::Expression(
+            ExpressionStatement::new(token.clone())
+                .with_expression(Expression::Hash(HashLiteral::new(token).with_pairs(map)))
+        );
+        assert_eq!(statement, &expected);
+    }
+
+    #[test]
+    fn test_parsing_hash_literals_with_expressions() {
+        let input = r#"{"one": 0 + 1, "two": 10 - 8, "three": 15 / 5}"#; 
+        let lexer = Lexer::new(input);
+        let mut parser = Parser::new(lexer);
+        let program = parser.parse_program().unwrap();
+        let error_string = check_parser_errors(&parser);
+        if error_string.is_some() {
+            println!("{}", error_string.unwrap());
+        }
+        let statement = &program.statements[0];
+
+        let token = Token::new(TokenType::Lbrace, &TokenType::Lbrace.literal());
+        let mut map: BTreeMap<Expression, Expression> = BTreeMap::new();
+        map.insert(Expression::String(StringLiteral::new("one")), Expression::Infix(InfixExpression::new(
+            Token::new(TokenType::Plus, &TokenType::Plus.literal())
+        ).with_left(Expression::Int(0)).with_right(Expression::Int(1))
+        ));
+        map.insert(Expression::String(StringLiteral::new("two")), Expression::Infix(InfixExpression::new(
+            Token::new(TokenType::Minus, &TokenType::Minus.literal())
+        ).with_left(Expression::Int(10)).with_right(Expression::Int(8))
+        ));
+        map.insert(Expression::String(StringLiteral::new("three")),Expression::Infix(InfixExpression::new(
+            Token::new(TokenType::Slash, &TokenType::Slash.literal())
+        ).with_left(Expression::Int(15)).with_right(Expression::Int(5))
+        ));
+ 
+        let expected = StatementType::Expression(
+            ExpressionStatement::new(token.clone())
+                .with_expression(Expression::Hash(HashLiteral::new(token).with_pairs(map)))
+        );
+        assert_eq!(statement, &expected);
+    }
+
 }
+

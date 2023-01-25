@@ -1,4 +1,4 @@
-use std::{cell::RefCell, rc::Rc};
+use std::{cell::RefCell, rc::Rc, collections::HashMap};
 
 use crate::{environment::Environment, ast::{BlockStatement, Identifier}, builtins::BuiltinFn};
 
@@ -12,7 +12,19 @@ pub enum Object {
     String(String),
     Builtin(BuiltinObject),
     Array(ArrayObject),
+    Hash(HashMap<Object, Object>),
     Null,
+}
+
+impl std::hash::Hash for Object {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        match *self {
+            Object::Integer(ref i) => i.hash(state),
+            Object::Boolean(ref b) => b.hash(state),
+            Object::String(ref s) => s.hash(state),
+            _ => "".hash(state),
+        }
+    }
 }
 
 impl std::fmt::Display for Object {
@@ -30,6 +42,10 @@ impl std::fmt::Display for Object {
             Object::String(s) => write!(f, "{}", s),
             Object::Builtin(builtin) => write!(f, "{}", builtin),
             Object::Array(array) => write!(f, "{}", array),
+            Object::Hash(h) => {
+                let pairs = h.iter().map(|(k, v)| format!("{}: {}", k, v)).collect::<Vec<String>>();
+                write!(f, "{{{}}}", pairs.join(", "))
+            }
         }
     }
 }
@@ -50,6 +66,7 @@ impl Object {
             Object::Builtin(_) => "BUILTIN",
             Object::Null => "NULL",
             Object::Array(_) => "ARRAY",
+            Object::Hash(_) => "HASH",
         }.to_string()
     }
 }
@@ -124,8 +141,4 @@ impl std::fmt::Display for ArrayObject {
         write!(f, "[{}]", objects)
     }
 }
-
-
-
-
 

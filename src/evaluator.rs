@@ -1,7 +1,7 @@
-use std::{cell::RefCell, rc::Rc};
+use std::{cell::RefCell, rc::Rc, collections::HashMap};
 
 use crate::{
-    ast::{BlockStatement, Expression, Identifier, Program, StatementType},
+    ast::{BlockStatement, Expression, Identifier, Program, StatementType, HashLiteral},
     builtins::Builtins,
     environment::Environment,
     object::{ArrayObject, BuiltinObject, FunctionObject, Object},
@@ -192,8 +192,6 @@ impl Evaluator {
                 }
             }
             Expression::String(s) => Some(Object::String(s.value.clone())),
-            Expression::Return => todo!(),
-            Expression::Assign => todo!(),
             Expression::ArrayLiteral(array) => {
                 let elements = self.eval_expressions(&array.elements, env);
                 if elements.len() == 1 {
@@ -214,7 +212,26 @@ impl Evaluator {
                 }
                 self.eval_index_expression(left, index)
             }
+            Expression::Hash(node) => self.eval_hash_literal(node, env),
+            Expression::Return => todo!(),
+            Expression::Assign => todo!(),
         }
+    }
+
+    fn eval_hash_literal(&mut self, hash: &HashLiteral, env: Rc<RefCell<Environment>>) -> Option<Object> {
+        let mut pairs = HashMap::new();
+        for (key, value) in &hash.pairs {
+            let key = self.eval_expression(key, env.clone()).unwrap();
+            if let Object::Error(_) = key {
+                return Some(key);
+            }
+            let value = self.eval_expression(value, env.clone()).unwrap();
+            if let Object::Error(_) = value {
+                return Some(value);
+            }
+            pairs.insert(key, value);
+        }
+        Some(Object::Hash(pairs))
     }
 
     fn eval_index_expression(&mut self, left: Object, index: Object) -> Option<Object> {
@@ -469,8 +486,10 @@ fn is_truthy(object: Object) -> bool {
 
 #[cfg(test)]
 mod test {
+    use std::collections::{BTreeMap, HashMap};
+
     use super::*;
-    use crate::{lexer::Lexer, parser::Parser};
+    use crate::{lexer::Lexer, parser::Parser, ast::StringLiteral};
     use pretty_assertions::assert_eq;
 
     fn test_eval(input: &str) -> Option<Object> {
@@ -725,6 +744,25 @@ mod test {
     }
 
     #[test]
+    fn test_enclosing_environments() {
+        let input = "
+let first = 10;
+let second = 10;
+let third = 10;
+
+let ourFunction = fn(first) {
+  let second = 20;
+
+  first + second + third;
+};
+
+ourFunction(20) + first + second;";
+
+	test_integer_object(&test_eval(input).unwrap(), 70);
+
+    }
+
+    #[test]
     fn test_closures() {
         let input = "
 let newAdder = fn(x) {
@@ -765,13 +803,33 @@ addTwo(2);";
             (r#"len("")"#, 0),
             (r#"len("four")"#, 4),
             (r#"len("hello world")"#, 11),
+            (r#"len([1, 2, 3])"#, 3),
+            (r#"len([])"#, 0),
+            (r#"first([1, 2, 3])"#, 1),
+            (r#"last([1, 2, 3])"#, 3),
         ];
+        let array_tests = vec![
+            (r#"rest([1, 2, 3])"#, Object::Array(ArrayObject::new(vec![Object::Integer(2), Object::Integer(3)]))),
+            (r#"push([], 1)"#, Object::Array(ArrayObject::new(vec![Object::Integer(1)]))),
+        ];
+        let null_tests = vec![
+            //(r#"puts("hello", "world!")"#, Object::Null),
+            (r#"first([])"#, Object::Null),
+            (r#"last([])"#, Object::Null),
+            (r#"rest([])"#, Object::Null),
+        ];
+
         let error_tests = vec![
             (r#"len(1)"#, "argument to `len` not supported, got INTEGER"),
             (
                 r#"len("one", "two")"#,
                 "wrong number of arguments. got 2, expected 1",
             ),
+            (r#"len(1)"#, "argument to `len` not supported, got INTEGER"),
+            (r#"len("one", "two")"#, "wrong number of arguments. got 2, expected 1"),
+            (r#"first(1)"#, "argument to `first` must be ARRAY, got INTEGER"),
+            (r#"last(1)"#, "argument to `last` must be ARRAY, got INTEGER"),
+            (r#"push(1, 1)"#, "argument to `push` must be ARRAY, got INTEGER"),
         ];
 
         for test in tests {
@@ -781,6 +839,17 @@ addTwo(2);";
                 _ => panic!("not an integer, got '{}'", evaluated),
             }
         }
+        for test in array_tests {
+            let evaluated = test_eval(test.0).unwrap();
+            println!("evaluating: {}", test.0);
+            assert_eq!(evaluated, test.1);
+        }
+
+        for test in null_tests {
+            let evaluated = test_eval(test.0).unwrap();
+            assert_eq!(evaluated, Object::Null);
+        }
+
         for test in error_tests {
             let evaluated = test_eval(test.0).unwrap();
             match evaluated {
@@ -867,5 +936,29 @@ addTwo(2);";
             }
         }
 
+    }
+
+    #[test]
+    fn test_hash_literals() {
+	    let input = r#"let two = "two";
+{
+    "one": 10 - 9,
+    two: 1 + 1,
+    "thr" + "ee": 6 / 2,
+    4: 4,
+    true: 5,
+    false: 6
+}"#;
+        let evaluated = test_eval(input).unwrap();
+        let mut map: HashMap<Object, Object> = HashMap::new();
+        map.insert(Object::String("one".to_string()), Object::Integer(1));
+        map.insert(Object::String("two".to_string()), Object::Integer(2));
+        map.insert(Object::String("three".to_string()), Object::Integer(3));
+        map.insert(Object::Integer(4), Object::Integer(4));
+        map.insert(Object::Boolean(true), Object::Integer(5));
+        map.insert(Object::Boolean(false), Object::Integer(6));
+
+        let expected = Object::Hash(map);
+        assert_eq!(evaluated, expected);
     }
 }

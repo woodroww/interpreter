@@ -1,3 +1,5 @@
+use std::collections::BTreeMap;
+
 use crate::token::{Token, TokenType};
 
 // -----------------------------------------------------------------------------
@@ -20,7 +22,7 @@ pub trait StatementInterface {
 //  Identifier
 // -----------------------------------------------------------------------------
 
-#[derive(Debug, Eq, PartialEq, Clone)]
+#[derive(Debug, Eq, PartialEq, Clone, Hash, Ord, PartialOrd)]
 pub struct Identifier {
     pub token: Token,
 }
@@ -43,7 +45,7 @@ impl Identifier {
     }
 }
 
-#[derive(Debug, Eq, PartialEq, Clone)]
+#[derive(Debug, Eq, PartialEq, Clone, Hash, Ord, PartialOrd)]
 pub struct BooleanExpression {
     pub token: Token,
     pub value: bool,
@@ -72,7 +74,7 @@ impl BooleanExpression {
     }
 }
 
-#[derive(Debug, Eq, PartialEq, Clone)]
+#[derive(Debug, Eq, PartialEq, Clone, Hash, Ord, PartialOrd)]
 pub struct BlockStatement {
     pub token: Token,
     pub statements: Vec<StatementType>,
@@ -100,7 +102,7 @@ impl std::fmt::Display for BlockStatement {
     }
 }
 
-#[derive(Debug, Eq, PartialEq, Clone)]
+#[derive(Debug, Eq, PartialEq, Clone, Hash, Ord, PartialOrd)]
 pub struct IfExpression {
     pub token: Token,
     pub condition: Option<Box<Expression>>,
@@ -162,7 +164,7 @@ impl std::fmt::Display for IfExpression {
 //  Expression
 // -----------------------------------------------------------------------------
 
-#[derive(Debug, Eq, PartialEq, Clone)]
+#[derive(Debug, Eq, PartialEq, Clone, Hash, Ord, PartialOrd)]
 pub enum Expression {
     Identifier(Identifier),
     Prefix(PrefixExpression),
@@ -177,6 +179,7 @@ pub enum Expression {
     String(StringLiteral),
     ArrayLiteral(ArrayLiteral),
     IndexExpression(IndexExpression),
+    Hash(HashLiteral),
 }
 
 impl std::fmt::Display for Expression {
@@ -195,6 +198,7 @@ impl std::fmt::Display for Expression {
             Expression::String(s) => write!(f, "{}", s),
             Expression::ArrayLiteral(a) => write!(f, "{}", a),
             Expression::IndexExpression(e) => write!(f, "{}", e),
+            Expression::Hash(h) => write!(f, "{}", h),
         }
     }
 }
@@ -203,7 +207,7 @@ impl std::fmt::Display for Expression {
 //  PrefixExpression
 // -----------------------------------------------------------------------------
 
-#[derive(Debug, Eq, PartialEq, Clone)]
+#[derive(Debug, Eq, PartialEq, Clone, Hash, Ord, PartialOrd)]
 pub struct PrefixExpression {
     pub token: Token, // Bang or Minus at this point
     //pub operator: String,
@@ -237,7 +241,7 @@ impl std::fmt::Display for PrefixExpression {
 //  InfixExpression
 // -----------------------------------------------------------------------------
 
-#[derive(Debug, Eq, PartialEq, Clone)]
+#[derive(Debug, Eq, PartialEq, Clone, Hash, Ord, PartialOrd)]
 pub struct InfixExpression {
     pub token: Token,
     pub left: Option<Box<Expression>>,
@@ -290,7 +294,7 @@ impl std::fmt::Display for InfixExpression {
 //  CallExpression
 // -----------------------------------------------------------------------------
 
-#[derive(Debug, Eq, PartialEq, Clone)]
+#[derive(Debug, Eq, PartialEq, Clone, Hash, Ord, PartialOrd)]
 pub struct CallExpression {
     pub token: Token,
     pub function: Option<Box<Expression>>,
@@ -341,7 +345,7 @@ impl std::fmt::Display for CallExpression {
 // Monkey program is a series of statements. These statements are contained in the
 // Program.Statements, which is just a slice of AST nodes that implement the Statement interface.
 
-#[derive(Debug, Eq, PartialEq, Clone)]
+#[derive(Debug, Eq, PartialEq, Clone, Hash, Ord, PartialOrd)]
 pub enum StatementType {
     Let(LetStatement),
     Return(ReturnStatement),
@@ -396,7 +400,7 @@ impl Program {
 //  LetStatement
 // -----------------------------------------------------------------------------
 
-#[derive(Debug, Eq, PartialEq, Clone)]
+#[derive(Debug, Eq, PartialEq, Clone, Hash, Ord, PartialOrd)]
 pub struct LetStatement {
     pub token: Token,
     pub name: Option<Identifier>,
@@ -454,7 +458,7 @@ impl NodeInterface for LetStatement {
 //  ReturnStatement
 // -----------------------------------------------------------------------------
 
-#[derive(Debug, Eq, PartialEq, Clone)]
+#[derive(Debug, Eq, PartialEq, Clone, Hash, Ord, PartialOrd)]
 pub struct ReturnStatement {
     pub token: Token,
     pub return_value: Option<Expression>,
@@ -499,7 +503,7 @@ impl ReturnStatement {
 // basically a wrapper for an expression, like when you type `1 + 1` in the
 // python REPL and you get 2, no let, no return
 
-#[derive(Debug, Eq, PartialEq, Clone)]
+#[derive(Debug, Eq, PartialEq, Clone, Hash, Ord, PartialOrd)]
 pub struct ExpressionStatement {
     pub token: Token,
     pub expression: Option<Expression>,
@@ -544,7 +548,7 @@ impl NodeInterface for ExpressionStatement {
 //  FunctionLiteral
 // -----------------------------------------------------------------------------
 
-#[derive(Debug, Eq, PartialEq, Clone)]
+#[derive(Debug, Eq, PartialEq, Clone, Hash, Ord, PartialOrd)]
 pub struct FunctionLiteralExpression {
     pub token: Token,
     pub parameters: Vec<Identifier>,
@@ -591,7 +595,7 @@ impl std::fmt::Display for FunctionLiteralExpression {
 //  FunctionLiteral
 // -----------------------------------------------------------------------------
 
-#[derive(Debug, PartialEq, Eq, Clone)]
+#[derive(Debug, PartialEq, Eq, Clone, Hash, Ord, PartialOrd)]
 pub struct StringLiteral {
     token: Token,
     pub value: String,
@@ -616,7 +620,7 @@ impl StringLiteral {
 //  FunctionLiteral
 // -----------------------------------------------------------------------------
 
-#[derive(Debug, PartialEq, Eq, Clone)]
+#[derive(Debug, PartialEq, Eq, Clone, Hash, Ord, PartialOrd)]
 pub struct ArrayLiteral {
     token: Token,
     pub elements: Vec<Expression>,
@@ -647,7 +651,7 @@ impl ArrayLiteral {
 //  IndexExpression
 // -----------------------------------------------------------------------------
 
-#[derive(Debug, PartialEq, Eq, Clone)]
+#[derive(Debug, PartialEq, Eq, Clone, Hash, Ord, PartialOrd)]
 pub struct IndexExpression {
     token: Token,
     pub left: Option<Box<Expression>>,
@@ -679,6 +683,35 @@ impl IndexExpression {
 
     pub fn set_index(&mut self, index: Expression) {
         self.index = Some(Box::new(index));
+    }
+}
+// -----------------------------------------------------------------------------
+//  HashLiteral
+// -----------------------------------------------------------------------------
+
+#[derive(Debug, PartialEq, Eq, Clone, Hash, Ord, PartialOrd)]
+pub struct HashLiteral {
+    token: Token,
+    pub pairs: BTreeMap<Expression, Expression>,
+}
+
+impl std::fmt::Display for HashLiteral {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let pairs: Vec<String> = self.pairs.iter().map(|(a, b)| format!("{}:{}", a, b)).collect();
+        write!(f, "{{{}}}", pairs.join(", "))
+    }
+}
+
+impl HashLiteral {
+    pub fn new(token: Token) -> Self {
+        Self {
+            token,
+            pairs: BTreeMap::new(),
+        }
+    }
+    pub fn with_pairs(mut self, pairs: BTreeMap<Expression, Expression>) -> Self {
+        self.pairs = pairs;
+        self
     }
 }
 

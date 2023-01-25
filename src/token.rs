@@ -1,5 +1,5 @@
 
-#[derive(Debug, Clone, Eq, PartialEq)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash, Ord, PartialOrd)]
 pub struct Token {
     pub token_type: TokenType,
     pub literal: String,
@@ -17,7 +17,7 @@ impl std::fmt::Display for Token {
     }
 }
 
-#[derive(Copy, Hash, Clone, Debug, Eq, PartialEq)]
+#[derive(Copy, Hash, Clone, Debug, Eq, PartialEq, Ord, PartialOrd)]
 pub enum TokenType {
     Illegal,
 
@@ -49,6 +49,7 @@ pub enum TokenType {
     Rbrace,
     Lbracket,
     Rbracket,
+    Colon,
 
     // Keywords
     Function,
@@ -131,6 +132,7 @@ impl TokenType {
             TokenType::String => "",
             TokenType::Lbracket => "[",
             TokenType::Rbracket => "]",
+            TokenType::Colon => ":",
         }.to_string()
     }
 
@@ -165,6 +167,7 @@ impl TokenType {
             TokenType::Else => "ELSE",
             TokenType::Return => "RETURN",
             TokenType::String => "STRING",
+            TokenType::Colon => "COLON",
         }
     }
 }

@@ -105,6 +105,10 @@ impl<'a> Iterator for Lexer<'a> {
                 token_literal = self.read_string();
                 token_type = TokenType::String;
             }
+            ':' => {
+                token_literal = c.to_string();
+                token_type = TokenType::Colon;
+            }
             c if c.is_numeric() => {
                 token_type = TokenType::Int;
                 token_literal = self.read_number(c).to_string();
@@ -237,6 +241,7 @@ if (5 < 10) {
 "foobar"
 "foo bar"
 [1, 2];
+{"foo": "bar"}
 "#;
         let tokens = Lexer::new(input).into_iter().collect::<Vec<Token>>();
         let expected = vec![
@@ -330,6 +335,13 @@ if (5 < 10) {
             Token { token_type: TokenType::Int, literal: "2".to_string() },
             Token { token_type: TokenType::Rbracket, literal: TokenType::Rbracket.literal() },
             Token { token_type: TokenType::Semicolon, literal: TokenType::Semicolon.literal() },
+
+            // {"foo": "bar"}
+            Token { token_type: TokenType::Lbrace, literal: TokenType::Lbrace.literal() },
+            Token { token_type: TokenType::String, literal: "foo".to_string() },
+            Token { token_type: TokenType::Colon, literal: TokenType::Colon.literal() },
+            Token { token_type: TokenType::String, literal: "bar".to_string() },
+            Token { token_type: TokenType::Rbrace, literal: TokenType::Rbrace.literal() },
         ];
 
         assert_eq!(tokens, expected);

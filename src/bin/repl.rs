@@ -156,5 +156,26 @@ Hey there Thorsten!
 >> a[99]
 null
 
+let map = fn(arr, f) {
+  let iter = fn(arr, accumulated) {
+    if (len(arr) == 0) {
+      accumulated
+   } else {
+      iter(rest(arr), push(accumulated, f(first(arr))));
+    }
+  };
+
+  iter(arr, []);
+};
+
+>> let a = [1, 2, 3, 4];
+>> let double = fn(x) { x * 2 };
+>> map(a, double);
+[2, 4, 6, 8]
+
+
+{"name": "Monkey", "age": 0, "type": "Language", "status": "awesome"}
+let bob = {"name": "Bob", "age": 99};
+>> bob["name”]
 
 */
