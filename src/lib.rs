@@ -1,3 +1,4 @@
+// Interpreter
 pub mod token;
 pub mod lexer;
 pub mod ast;
@@ -6,3 +7,5 @@ pub mod object;
 pub mod evaluator;
 pub mod environment;
 pub mod builtins;
+// Compiler
+pub mod code;
