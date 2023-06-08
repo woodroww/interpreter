@@ -66,7 +66,7 @@ func Lookup(op byte) (*Definition, error) {
 }
 */
 
-fn make(op: Opcode, operands: &Vec<u8>) -> Option<Vec<u8>> {
+fn make(op: Opcode, operands: &Vec<u16>) -> Option<Vec<u8>> {
     let def = match DEFINITIONS.get(&op) {
         Some(def) => def,
         None => return None,
@@ -78,59 +78,62 @@ fn make(op: Opcode, operands: &Vec<u8>) -> Option<Vec<u8>> {
     }
 
     let mut instruction = Vec::with_capacity(instruction_len as usize);
-    instruction[0] = op as u8;
+    instruction.push(op as u8);
 
-
-    let op_idx = 0;
-    for width in &def.operand_widths {
+    for (operand_idx, width) in def.operand_widths.iter().enumerate() {
         match width {
             2 => {
-               // binary.BigEndian.PutUint16(instruction[offset:], uint16(o))
-               operands[op_id]
-               operand_byte.to_be();
-
+                let operand_bytes = operands[operand_idx].to_be_bytes();
+                for byte in operand_bytes {
+                    instruction.push(byte);
+                }
             }
             _ => {}
         }
 
     }
 
-    for (i, operand_byte) in operands.iter().enumerate() {
-        let width = def.operand_widths[i];
-    }
-
     Some(instruction)
 }
 
-/*
-func Make(op Opcode, operands ...int) []byte {
-    def, ok := definitions[op]
-    if !ok {
-        return []byte{}
+#[cfg(test)]
+mod tests {
+	use super::*;
+
+    struct MakeData {
+        op: Opcode,
+        operands: Vec<u16>,
+        expected: Vec<u8>,
     }
 
-    instructionLen := 1
-    for _, w := range def.OperandWidths {
-        instructionLen += w
-    }
+    #[test]
+    fn test_make() {
+        let tests = vec![
+            MakeData {
+                op: Opcode::OpConstant,
+                operands: vec![65534],
+                expected: vec![Opcode::OpConstant as u8, 255, 254],
+            },
+        ];
 
-    // make is a go function that creates a slice, a dynamiclly-sized array
-    // this makes an array of bytes that is instructionLen long
-    instruction := make([]byte, instructionLen)
-    instruction[0] = byte(op)
-
-    offset := 1
-    for i, o := range operands {
-        width := def.OperandWidths[i]
-        switch width {
-        case 2:
-            binary.BigEndian.PutUint16(instruction[offset:], uint16(o))
+        for test in tests {
+            let instruction = make(test.op, &test.operands).unwrap();
+            println!("instruction {:?}", instruction);
+            if instruction.len() != test.expected.len() {
+                eprintln!("instruction has wrong length. want={}, got={}",
+                    test.expected.len(), instruction.len());
+                assert!(false);
+            }
+            for (i, b) in test.expected.iter().enumerate() {
+                if instruction[i] != *b {
+                    eprintln!("wrong byte at pos {}. want={}, got={}",
+                        i, b, instruction[i]);
+                    assert!(false);
+                }
+            }
         }
-        offset += width
-    }
-    return instruction
+	}
 }
-*/
 
 /*
 func TestMake(t *testing.T) {
