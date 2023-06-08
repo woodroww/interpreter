@@ -6,7 +6,7 @@ type Instructions []byte
 type Opcode byte
 */
 // pg 28
-type Instructions = Vec<Opcode>;
+pub type Instructions = Vec<u8>;
 
 // pg 29
 /*
@@ -66,7 +66,7 @@ func Lookup(op byte) (*Definition, error) {
 }
 */
 
-fn make(op: Opcode, operands: &Vec<u16>) -> Option<Vec<u8>> {
+pub fn make(op: Opcode, operands: &Vec<u16>) -> Option<Vec<u8>> {
     let def = match DEFINITIONS.get(&op) {
         Some(def) => def,
         None => return None,
@@ -90,9 +90,7 @@ fn make(op: Opcode, operands: &Vec<u16>) -> Option<Vec<u8>> {
             }
             _ => {}
         }
-
     }
-
     Some(instruction)
 }
 

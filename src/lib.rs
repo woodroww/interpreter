@@ -9,3 +9,4 @@ pub mod environment;
 pub mod builtins;
 // Compiler
 pub mod code;
+pub mod compiler;
