@@ -68,6 +68,7 @@ fn format_instruction(def: &Definition, operands: Vec<u16>) -> String {
 pub enum Opcode {
     OpConstant = 1,
     OpAdd = 2,
+    OpPop = 3, // used after every expression, to clean the stack
 }
 
 // these two (above and below) need to match
@@ -78,6 +79,7 @@ impl TryFrom<u8> for Opcode {
         match value {
             1 => Ok(Opcode::OpConstant),
             2 => Ok(Opcode::OpAdd),
+            3 => Ok(Opcode::OpPop),
             _ => Err(format!("invalid Opcode value {}", value)),
         }
     }
@@ -88,6 +90,7 @@ impl std::fmt::Display for Opcode {
         match self {
             Opcode::OpConstant => write!(f, "OpConstant"),
             Opcode::OpAdd => write!(f, "OpAdd"),
+            Opcode::OpPop => write!(f, "OpPop"),
         }
     }
 }
@@ -112,6 +115,13 @@ static DEFINITIONS: Lazy<HashMap<Opcode, Definition>> = Lazy::new(|| {
         Opcode::OpAdd,
         Definition {
             name: "OpAdd".to_string(),
+            operand_widths: vec![], // no operands
+        },
+    );
+    map.insert(
+        Opcode::OpPop,
+        Definition {
+            name: "OpPop".to_string(),
             operand_widths: vec![], // no operands
         },
     );

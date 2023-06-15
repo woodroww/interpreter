@@ -40,7 +40,11 @@ impl Compiler {
             crate::ast::StatementType::Return(_) => todo!(),
             crate::ast::StatementType::Expression(expresssion_statement) => {
                 match expresssion_statement.expression {
-                    Some(expression) => self.compile_expression(&expression),
+                    Some(expression) => {
+                        self.compile_expression(&expression)?;
+                        self.emit(Opcode::OpPop, vec![]);
+                        Ok(())
+                    }
                     None => Ok(())
                 }
             }
@@ -135,8 +139,19 @@ mod tests {
                     crate::code::make(Opcode::OpConstant, &vec![0]).unwrap(),
                     crate::code::make(Opcode::OpConstant, &vec![1]).unwrap(),
                     crate::code::make(Opcode::OpAdd, &vec![]).unwrap(),
+                    crate::code::make(Opcode::OpPop, &vec![]).unwrap(),
                 ],
-            }
+            },
+            CompilerTestCase {
+                input: "1; 2".to_string(),
+                expected_constants: vec![Object::Integer(1), Object::Integer(2)],
+                expected_instructions: vec![
+                    crate::code::make(Opcode::OpConstant, &vec![0]).unwrap(),
+                    crate::code::make(Opcode::OpPop, &vec![]).unwrap(),
+                    crate::code::make(Opcode::OpConstant, &vec![1]).unwrap(),
+                    crate::code::make(Opcode::OpPop, &vec![]).unwrap(),
+                ],
+            },
         ];
 
         run_compiler_tests(tests);

@@ -6,6 +6,7 @@ pub struct VM {
     stack: Vec<Object>,
     // sp    int // Always points to the next value. Top of stack is stack[sp-1]
     // sp: usize,
+    last_popped: Option<Object>,
 }
 
 const STACK_SIZE: usize = 2048;
@@ -16,6 +17,7 @@ impl VM {
             constants: bytecode.constants,
             instructions: bytecode.instructions,
             stack: Vec::with_capacity(STACK_SIZE),
+            last_popped: None,
         }
     }
 
@@ -33,8 +35,8 @@ impl VM {
                     self.push(self.constants[const_index as usize].clone());
                 }
                 Opcode::OpAdd => {
-                    let right = self.stack.pop().unwrap();
-                    let left = self.stack.pop().unwrap();
+                    let right = self.pop().unwrap();
+                    let left = self.pop().unwrap();
                     let right_value = match right {
                         Object::Integer(i) => i,
                         _ => todo!(),
@@ -46,16 +48,35 @@ impl VM {
                     let result = left_value + right_value;
                     self.push(Object::Integer(result));
                 }
+                Opcode::OpPop => {
+                    self.pop();
+                    //todo!()
+                }
             }
         }
         Ok(())
     }
 
-    pub fn stack_top(&self) -> Option<&Object> {
-        self.stack.iter().last()
+    pub fn last_popped_stack_element(&mut self) -> Option<Object> {
+        let obj = self.last_popped.clone();
+        self.last_popped = None; // is this what we want ?
+        obj
+    }
+
+    pub fn pop(&mut self) -> Option<Object> {
+        match self.stack.pop() {
+            Some(obj) => {
+                self.last_popped = Some(obj.clone());
+                Some(obj)
+            }
+            None => {
+                None
+            }
+        }
     }
     
     pub fn push(&mut self, o: Object) {
+        // this is not really necessary unless I switch to an array implementation
         if self.stack.len() >= STACK_SIZE {
             panic!("stack overflow");
         }
@@ -78,8 +99,8 @@ mod tests {
         for test in tests {
             let bytecode = crate::test_helpers::input_to_bytecode(&test.input);
             let mut vm = VM::new(bytecode);
-            let err = vm.run();
-            let stack_elem = vm.stack_top().unwrap();
+            vm.run().unwrap();
+            let stack_elem = vm.last_popped_stack_element().unwrap();
             test_expected_object(&test.expected, &stack_elem);
         }
     }
