@@ -1,3 +1,5 @@
+use anyhow::anyhow;
+
 use crate::{code::{Instructions, Opcode}, compiler::Bytecode, object::Object};
 
 pub struct VM {
@@ -34,26 +36,40 @@ impl VM {
                     let const_index = value;
                     self.push(self.constants[const_index as usize].clone());
                 }
-                Opcode::OpAdd => {
-                    let right = self.pop().unwrap();
-                    let left = self.pop().unwrap();
-                    let right_value = match right {
-                        Object::Integer(i) => i,
-                        _ => todo!(),
-                    };
-                    let left_value = match left {
-                        Object::Integer(i) => i,
-                        _ => todo!(),
-                    };
-                    let result = left_value + right_value;
-                    self.push(Object::Integer(result));
-                }
                 Opcode::OpPop => {
                     self.pop();
-                    //todo!()
+                }
+                Opcode::OpAdd | Opcode::OpSub | Opcode::OpMul | Opcode::OpDiv => {
+                    self.execute_binary_operation(op)?;
                 }
             }
         }
+        Ok(())
+    }
+
+    fn execute_binary_operation(&mut self, op: Opcode) -> anyhow::Result<()> {
+        let right = self.pop().unwrap();
+        let left = self.pop().unwrap();
+        let right_value = match right {
+            Object::Integer(i) => i,
+            _ => todo!(),
+        };
+        let left_value = match left {
+            Object::Integer(i) => i,
+            _ => todo!(),
+        };
+        self.execute_binary_integer_operation(op, left_value, right_value)
+    }
+
+    fn execute_binary_integer_operation(&mut self, op: Opcode, left: isize, right: isize) -> anyhow::Result<()> {
+        let result = match op {
+            Opcode::OpAdd => left + right,
+            Opcode::OpSub => left - right,
+            Opcode::OpMul => left * right,
+            Opcode::OpDiv => left / right,
+            _ => return Err(anyhow!("unknown integer operator: {}", op))
+        };
+        self.push(Object::Integer(result));
         Ok(())
     }
 
@@ -136,7 +152,43 @@ mod tests {
             VMTestCase {
                 input: "1 + 2".to_string(),
                 expected: Object::Integer(3),
-            }
+            },
+            VMTestCase {
+                input: "1 - 2".to_string(),
+                expected: Object::Integer(-1),
+            },
+            VMTestCase {
+                input: "1 * 2".to_string(),
+                expected: Object::Integer(2),
+            },
+            VMTestCase {
+                input: "4 / 2".to_string(),
+                expected: Object::Integer(2),
+            },
+            VMTestCase {
+                input: "50 / 2 * 2 + 10 - 5".to_string(),
+                expected: Object::Integer(55),
+            },
+            VMTestCase {
+                input: "5 + 5 + 5 + 5 - 10".to_string(),
+                expected: Object::Integer(10),
+            },
+            VMTestCase {
+                input: "2 * 2 * 2 * 2 * 2".to_string(),
+                expected: Object::Integer(32),
+            },
+            VMTestCase {
+                input: "5 * 2 + 10".to_string(),
+                expected: Object::Integer(20),
+            },
+            VMTestCase {
+                input: "5 + 2 * 10".to_string(),
+                expected: Object::Integer(25),
+            },
+            VMTestCase {
+                input: "5 * (2 + 10)".to_string(),
+                expected: Object::Integer(60),
+            },
         ];
         run_vm_tests(tests);
     }

@@ -111,9 +111,11 @@ fn start() -> io::Result<()> {
             Err(err) => eprintln!("Woops! Executing bytecode failed:\n {}\n", err),
         }
 
-        let stack_top = machine.last_popped_stack_element().unwrap();
+        match machine.last_popped_stack_element() {
+            Some(stack_top) => println!("{}", stack_top),
+            None => {}
+        }
         
-        println!("{}", stack_top);
     }
 }
 

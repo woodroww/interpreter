@@ -45,7 +45,7 @@ impl Compiler {
                         self.emit(Opcode::OpPop, vec![]);
                         Ok(())
                     }
-                    None => Ok(())
+                    None => Err(anyhow::anyhow!("Expected an Expression from the ExpressionStatement")),
                 }
             }
             crate::ast::StatementType::Block(_) => todo!(),
@@ -91,6 +91,18 @@ impl Compiler {
                     self.emit(Opcode::OpAdd, vec![]);
                     Ok(())
                 },
+                TokenType::Minus => {
+                    self.emit(Opcode::OpSub, vec![]);
+                    Ok(())
+                }
+                TokenType::Asterisk => {
+                    self.emit(Opcode::OpMul, vec![]);
+                    Ok(())
+                }
+                TokenType::Slash => {
+                    self.emit(Opcode::OpDiv, vec![]);
+                    Ok(())
+                }
                 _ => return Err(anyhow::anyhow!("unknown operator {}", infix.operator())),
             },
             None => todo!(),
@@ -152,6 +164,36 @@ mod tests {
                     crate::code::make(Opcode::OpPop, &vec![]).unwrap(),
                 ],
             },
+            CompilerTestCase {
+                input: "1 - 2".to_string(),
+                expected_constants: vec![Object::Integer(1), Object::Integer(2)],
+                expected_instructions: vec![
+                    crate::code::make(Opcode::OpConstant, &vec![0]).unwrap(),
+                    crate::code::make(Opcode::OpConstant, &vec![1]).unwrap(),
+                    crate::code::make(Opcode::OpSub, &vec![]).unwrap(),
+                    crate::code::make(Opcode::OpPop, &vec![]).unwrap(),
+                ],
+            },
+            CompilerTestCase {
+                input: "1 * 2".to_string(),
+                expected_constants: vec![Object::Integer(1), Object::Integer(2)],
+                expected_instructions: vec![
+                    crate::code::make(Opcode::OpConstant, &vec![0]).unwrap(),
+                    crate::code::make(Opcode::OpConstant, &vec![1]).unwrap(),
+                    crate::code::make(Opcode::OpMul, &vec![]).unwrap(),
+                    crate::code::make(Opcode::OpPop, &vec![]).unwrap(),
+                ],
+            },
+            CompilerTestCase {
+                input: "2 / 1".to_string(),
+                expected_constants: vec![Object::Integer(2), Object::Integer(1)],
+                expected_instructions: vec![
+                    crate::code::make(Opcode::OpConstant, &vec![0]).unwrap(),
+                    crate::code::make(Opcode::OpConstant, &vec![1]).unwrap(),
+                    crate::code::make(Opcode::OpDiv, &vec![]).unwrap(),
+                    crate::code::make(Opcode::OpPop, &vec![]).unwrap(),
+                ],
+            },
         ];
 
         run_compiler_tests(tests);
@@ -192,7 +234,7 @@ mod tests {
     }
 
     fn test_constants(expected: Vec<Object>, actual: Vec<Object>) {
-        println!("test_constants\n\texpected: {:?}\n\tactual: {:?}", expected, actual);
+        //println!("test_constants\n\texpected: {:?}\n\tactual: {:?}", expected, actual);
         if actual.len() != expected.len() {
             eprintln!("wrong number of constants.\nwant={:?}\ngot={:?}",
                 expected.len(), actual.len());

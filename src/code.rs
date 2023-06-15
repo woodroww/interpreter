@@ -69,6 +69,9 @@ pub enum Opcode {
     OpConstant = 1,
     OpAdd = 2,
     OpPop = 3, // used after every expression, to clean the stack
+    OpSub = 4,
+    OpMul = 5,
+    OpDiv = 6,
 }
 
 // these two (above and below) need to match
@@ -80,6 +83,9 @@ impl TryFrom<u8> for Opcode {
             1 => Ok(Opcode::OpConstant),
             2 => Ok(Opcode::OpAdd),
             3 => Ok(Opcode::OpPop),
+            4 => Ok(Opcode::OpSub),
+            5 => Ok(Opcode::OpMul),
+            6 => Ok(Opcode::OpDiv),
             _ => Err(format!("invalid Opcode value {}", value)),
         }
     }
@@ -91,6 +97,9 @@ impl std::fmt::Display for Opcode {
             Opcode::OpConstant => write!(f, "OpConstant"),
             Opcode::OpAdd => write!(f, "OpAdd"),
             Opcode::OpPop => write!(f, "OpPop"),
+            Opcode::OpSub => write!(f, "OpSub"),
+            Opcode::OpMul => write!(f, "OpMul"),
+            Opcode::OpDiv => write!(f, "OpDiv"),
         }
     }
 }
@@ -122,6 +131,27 @@ static DEFINITIONS: Lazy<HashMap<Opcode, Definition>> = Lazy::new(|| {
         Opcode::OpPop,
         Definition {
             name: "OpPop".to_string(),
+            operand_widths: vec![], // no operands
+        },
+    );
+    map.insert(
+        Opcode::OpSub,
+        Definition {
+            name: "OpSub".to_string(),
+            operand_widths: vec![], // no operands
+        },
+    );
+    map.insert(
+        Opcode::OpMul,
+        Definition {
+            name: "OpMul".to_string(),
+            operand_widths: vec![], // no operands
+        },
+    );
+    map.insert(
+        Opcode::OpDiv,
+        Definition {
+            name: "OpDiv".to_string(),
             operand_widths: vec![], // no operands
         },
     );
