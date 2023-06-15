@@ -1,4 +1,9 @@
-use crate::{code::{Instructions, Opcode}, object::Object, ast::{Program, StatementType, InfixExpression, Expression}, token::TokenType};
+use crate::{
+    ast::{Expression, InfixExpression, Program, StatementType},
+    code::{Instructions, Opcode},
+    object::Object,
+    token::TokenType,
+};
 
 pub struct Compiler {
     instructions: Instructions,
@@ -45,7 +50,9 @@ impl Compiler {
                         self.emit(Opcode::OpPop, vec![]);
                         Ok(())
                     }
-                    None => Err(anyhow::anyhow!("Expected an Expression from the ExpressionStatement")),
+                    None => Err(anyhow::anyhow!(
+                        "Expected an Expression from the ExpressionStatement"
+                    )),
                 }
             }
             crate::ast::StatementType::Block(_) => todo!(),
@@ -62,10 +69,16 @@ impl Compiler {
                 let what = self.add_constant(integer_obj);
                 self.emit(Opcode::OpConstant, vec![what]);
                 Ok(())
-            },
+            }
             Expression::Return => todo!(),
             Expression::Assign => todo!(),
-            Expression::Boolean(_) => todo!(),
+            Expression::Boolean(boolean) => {
+                match boolean.value {
+                    true => self.emit(Opcode::OpTrue, vec![]),
+                    false => self.emit(Opcode::OpFalse, vec![]),
+                };
+                Ok(())
+            }
             Expression::If(_) => todo!(),
             Expression::FunctionLiteral(_) => todo!(),
             Expression::Call(_) => todo!(),
@@ -90,7 +103,7 @@ impl Compiler {
                 TokenType::Plus => {
                     self.emit(Opcode::OpAdd, vec![]);
                     Ok(())
-                },
+                }
                 TokenType::Minus => {
                     self.emit(Opcode::OpSub, vec![]);
                     Ok(())
@@ -131,9 +144,9 @@ impl Compiler {
 
 #[cfg(test)]
 mod tests {
-    use std::ops::Deref;
-    use crate::code::Opcode;
     use super::*;
+    use crate::code::Opcode;
+    use std::ops::Deref;
 
     struct CompilerTestCase {
         input: String,
@@ -208,7 +221,7 @@ mod tests {
     }
 
     fn concat_instructions(ins: Vec<Instructions>) -> Instructions {
-        // TODO capacity 
+        // TODO capacity
         let mut concatted: Vec<u8> = Vec::new();
         for ins in ins {
             concatted.extend(ins.deref());
@@ -222,13 +235,17 @@ mod tests {
         //println!("jambones expected: {:?}", concatted.0);
 
         if actual.len() != concatted.len() {
-            panic!("wrong instructions length.\nwant={}\ngot={}",
-                concatted, actual);
+            panic!(
+                "wrong instructions length.\nwant={}\ngot={}",
+                concatted, actual
+            );
         }
         for ((i, expected), actual) in concatted.iter().enumerate().zip(actual.iter()) {
             if actual != expected {
-                panic!("wrong instruction at {}.\nwant={}\ngot={}",
-                    i, concatted, actual);
+                panic!(
+                    "wrong instruction at {}.\nwant={}\ngot={}",
+                    i, concatted, actual
+                );
             }
         }
     }
@@ -236,18 +253,43 @@ mod tests {
     fn test_constants(expected: Vec<Object>, actual: Vec<Object>) {
         //println!("test_constants\n\texpected: {:?}\n\tactual: {:?}", expected, actual);
         if actual.len() != expected.len() {
-            eprintln!("wrong number of constants.\nwant={:?}\ngot={:?}",
-                expected.len(), actual.len());
+            eprintln!(
+                "wrong number of constants.\nwant={:?}\ngot={:?}",
+                expected.len(),
+                actual.len()
+            );
             panic!();
         }
         for (i, constant) in expected.iter().enumerate() {
             match constant {
                 Object::Integer(value) => {
                     crate::test_helpers::test_integer_object(*value, &actual[i]);
-                },
+                }
                 _ => todo!(),
             }
         }
     }
 
+    #[test]
+    fn test_boolean_expressions() {
+        let tests = vec![
+            CompilerTestCase {
+                input: "true".to_string(),
+                expected_constants: vec![],
+                expected_instructions: vec![
+                    crate::code::make(Opcode::OpTrue, &vec![]).unwrap(),
+                    crate::code::make(Opcode::OpPop, &vec![]).unwrap(),
+                ],
+            },
+            CompilerTestCase {
+                input: "false".to_string(),
+                expected_constants: vec![],
+                expected_instructions: vec![
+                    crate::code::make(Opcode::OpFalse, &vec![]).unwrap(),
+                    crate::code::make(Opcode::OpPop, &vec![]).unwrap(),
+                ],
+            },
+        ];
+        run_compiler_tests(tests);
+    }
 }

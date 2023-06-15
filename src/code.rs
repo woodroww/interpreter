@@ -72,6 +72,8 @@ pub enum Opcode {
     OpSub = 4,
     OpMul = 5,
     OpDiv = 6,
+    OpTrue = 7,
+    OpFalse = 8,
 }
 
 // these two (above and below) need to match
@@ -86,6 +88,8 @@ impl TryFrom<u8> for Opcode {
             4 => Ok(Opcode::OpSub),
             5 => Ok(Opcode::OpMul),
             6 => Ok(Opcode::OpDiv),
+            7 => Ok(Opcode::OpTrue),
+            8 => Ok(Opcode::OpFalse),
             _ => Err(format!("invalid Opcode value {}", value)),
         }
     }
@@ -100,6 +104,8 @@ impl std::fmt::Display for Opcode {
             Opcode::OpSub => write!(f, "OpSub"),
             Opcode::OpMul => write!(f, "OpMul"),
             Opcode::OpDiv => write!(f, "OpDiv"),
+            Opcode::OpTrue => write!(f, "OpTrue"),
+            Opcode::OpFalse => write!(f, "OpFalse"),
         }
     }
 }
@@ -152,6 +158,20 @@ static DEFINITIONS: Lazy<HashMap<Opcode, Definition>> = Lazy::new(|| {
         Opcode::OpDiv,
         Definition {
             name: "OpDiv".to_string(),
+            operand_widths: vec![], // no operands
+        },
+    );
+    map.insert(
+        Opcode::OpTrue,
+        Definition {
+            name: "OpTrue".to_string(),
+            operand_widths: vec![], // no operands
+        },
+    );
+    map.insert(
+        Opcode::OpFalse,
+        Definition {
+            name: "OpFalse".to_string(),
             operand_widths: vec![], // no operands
         },
     );

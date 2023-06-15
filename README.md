@@ -3,6 +3,7 @@ Following along with Thorsten Ball's book [Writing An Interpreter In Go](https:/
  we have three types of statements in Monkey: let statements, return statements and expression statements. 
 block???
 
+I have not used any global true or false boolean objects.
 
 /*
 pub struct Lexer<'a> {

@@ -22,3 +22,10 @@ pub fn test_integer_object(expected: isize, obj: &Object) {
     }
 }
 
+pub fn test_boolean_object(expected: bool, obj: &Object) {
+    match obj {
+        Object::Boolean(boolean) => assert_eq!(boolean, &expected),
+        _ => panic!("expected boolean, got {}", obj),
+    }
+}
+

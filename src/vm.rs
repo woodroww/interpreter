@@ -42,6 +42,12 @@ impl VM {
                 Opcode::OpAdd | Opcode::OpSub | Opcode::OpMul | Opcode::OpDiv => {
                     self.execute_binary_operation(op)?;
                 }
+                Opcode::OpTrue => {
+                    self.push(Object::Boolean(true));
+                }
+                Opcode::OpFalse => {
+                    self.push(Object::Boolean(false));
+                }
             }
         }
         Ok(())
@@ -126,7 +132,9 @@ mod tests {
             Object::Integer(i) => {
                 test_integer_object(*i, actual);
             }
-            Object::Boolean(_) => todo!(),
+            Object::Boolean(b) => {
+                test_boolean_object(*b, actual);
+            },
             Object::Return(_) => todo!(),
             Object::Error(_) => todo!(),
             Object::Function(_) => todo!(),
@@ -189,6 +197,15 @@ mod tests {
                 input: "5 * (2 + 10)".to_string(),
                 expected: Object::Integer(60),
             },
+        ];
+        run_vm_tests(tests);
+    }
+
+    #[test]
+    fn test_boolean_expressions() {
+        let tests = vec![
+            VMTestCase { input: "true".to_string(), expected: Object::Boolean(true) },
+            VMTestCase { input: "false".to_string(), expected: Object::Boolean(false) }
         ];
         run_vm_tests(tests);
     }
