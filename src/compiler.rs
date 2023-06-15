@@ -19,6 +19,17 @@ impl Compiler {
     }
 
     pub fn compile(&self, program: Program) -> Result<(), ()> {
+        /*
+        let s = &program.statements[0];
+        match s {
+            crate::ast::StatementType::Let(_) => todo!(),
+            crate::ast::StatementType::Return(_) => todo!(),
+            crate::ast::StatementType::Expression(expresssion_statement) => {
+                self.compile(expresssion_statement.expression);
+            }
+            crate::ast::StatementType::Block(_) => todo!(),
+        }
+        */
         Ok(())
     }
 
@@ -32,6 +43,8 @@ impl Compiler {
 
 #[cfg(test)]
 mod tests {
+    use std::ops::Deref;
+
     use crate::{code::Opcode, lexer::Lexer, parser::Parser};
 
     use super::*;
@@ -73,18 +86,28 @@ mod tests {
         }
     }
 
-    fn test_instructions(expected: Vec<Instructions>, actual: Instructions) {
-        let concatted: Vec<u8> = expected.into_iter().flatten().collect();
-        if actual.len() != concatted.len() {
-            eprintln!("wrong instructions length.\nwant={:?}\ngot={:?}",
-                concatted, actual);
-            panic!();
+    fn concat_instructions(ins: Vec<Instructions>) -> Instructions {
+        // TODO capacity 
+        let mut concatted: Vec<u8> = Vec::new();
+        for ins in ins {
+            concatted.extend(ins.deref());
         }
-        for ((i, expected), actual) in concatted.iter().enumerate().zip(actual) {
-            if actual != *expected {
-                eprintln!("wrong instruction at {}.\nwant={:?}\ngot={:?}",
-                    i, concatted, actual);
-                panic!();
+        Instructions(concatted)
+    }
+
+    fn test_instructions(expected: Vec<Instructions>, actual: Instructions) {
+        let concatted = concat_instructions(expected);
+        println!("jambones actual:   {:?}", actual.0);
+        println!("jambones expected: {:?}", concatted.0);
+
+        if actual.len() != concatted.len() {
+            panic!("wrong instructions length.\nwant={:#02x?}\ngot={}",
+                concatted.0, actual);
+        }
+        for ((i, expected), actual) in concatted.iter().enumerate().zip(actual.iter()) {
+            if actual != expected {
+                panic!("wrong instruction at {}.\nwant={:?}\ngot={:?}",
+                    i, concatted.0, actual);
             }
         }
     }
@@ -111,4 +134,5 @@ mod tests {
             _ => panic!("expected integer, got {}", obj),
         }
     }
+
 }
