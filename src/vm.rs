@@ -1,6 +1,6 @@
 use crate::{code::{Instructions, Opcode}, compiler::Bytecode, object::Object};
 
-struct VM {
+pub struct VM {
     constants: Vec<Object>,
     instructions: Instructions,
     stack: Vec<Object>,
@@ -20,7 +20,7 @@ impl VM {
     }
 
     // fetch-decode-execute
-    pub fn run(&mut self) {
+    pub fn run(&mut self) -> Result<(), anyhow::Error> {
         let what = self.instructions.clone();
         let mut iter = what.0.into_iter();
         while let Some(instruction) = iter.next() {
@@ -48,6 +48,7 @@ impl VM {
                 }
             }
         }
+        Ok(())
     }
 
     pub fn stack_top(&self) -> Option<&Object> {

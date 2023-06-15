@@ -1,5 +1,8 @@
 Following along with Thorsten Ball's book [Writing An Interpreter In Go](https://interpreterbook.com/), but in Rust.
 
+ we have three types of statements in Monkey: let statements, return statements and expression statements. 
+block???
+
 
 /*
 pub struct Lexer<'a> {

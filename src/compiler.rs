@@ -27,14 +27,14 @@ impl Compiler {
         (self.constants.len() - 1) as u16
     }
 
-    pub fn compile(&mut self, program: Program) -> Result<(), ()> {
+    pub fn compile(&mut self, program: Program) -> Result<(), anyhow::Error> {
         for statement in program.statements {
             self.compile_statement(statement)?;
         }
         Ok(())
     }
 
-    fn compile_statement(&mut self, statement: StatementType) -> Result<(), ()> {
+    fn compile_statement(&mut self, statement: StatementType) -> Result<(), anyhow::Error> {
         match statement {
             crate::ast::StatementType::Let(_) => todo!(),
             crate::ast::StatementType::Return(_) => todo!(),
@@ -48,7 +48,7 @@ impl Compiler {
         }
     }
 
-    fn compile_expression(&mut self, expression: &Expression) -> Result<(), ()> {
+    fn compile_expression(&mut self, expression: &Expression) -> Result<(), anyhow::Error> {
         match expression {
             Expression::Identifier(_) => todo!(),
             Expression::Prefix(_) => todo!(),
@@ -72,7 +72,7 @@ impl Compiler {
         }
     }
 
-    fn compile_infix_expression(&mut self, infix: &InfixExpression) -> Result<(), ()> {
+    fn compile_infix_expression(&mut self, infix: &InfixExpression) -> Result<(), anyhow::Error> {
         match &infix.left {
             Some(left) => self.compile_expression(&*left)?,
             None => {}
@@ -87,7 +87,7 @@ impl Compiler {
                     self.emit(Opcode::OpAdd, vec![]);
                     Ok(())
                 },
-                _ => panic!("unknown operator {}", infix.operator()),
+                _ => return Err(anyhow::anyhow!("unknown operator {}", infix.operator())),
             },
             None => todo!(),
         }

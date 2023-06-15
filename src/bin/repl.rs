@@ -2,8 +2,10 @@ use std::cell::RefCell;
 use std::io;
 use std::io::Write;
 use std::rc::Rc;
+use interpreter::compiler::Compiler;
+use interpreter::vm::VM;
 use interpreter::{lexer::Lexer, parser::Parser};
-use interpreter::evaluator::*;
+use interpreter::{evaluator::*, vm};
 use interpreter::environment::Environment;
 
 /*
@@ -38,7 +40,7 @@ fn main() -> io::Result<()> {
     Ok(())
 }
 
-fn start() -> io::Result<()> {
+fn old_start_from_interpreter_book() -> io::Result<()> {
     let mut evaluator = Evaluator::new();
     let env = Rc::new(RefCell::new(Environment::new()));
     println!("{}", MONKEY_FACE);
@@ -70,6 +72,48 @@ fn start() -> io::Result<()> {
         if evaluated.is_some() {
             println!("{}", evaluated.unwrap());
         }
+    }
+}
+
+fn start() -> io::Result<()> {
+    println!("{}", MONKEY_FACE);
+    loop {
+        print!("{}", PROMPT);
+        io::stdout().flush()?;
+        let mut buffer = String::new();
+        io::stdin().read_line(&mut buffer)?;
+        if buffer.len() == 0 {
+            return Ok(());
+        }
+        let mut parser = Parser::new(Lexer::new(&buffer));
+        let program = match parser.parse_program() {
+            Some(program) => program,
+            None => {
+                println!("parse_program returned None");
+                continue;
+            }
+        };
+
+        let errors = parser.errors();
+        if errors.len() != 0 {
+            print_parse_errors(errors);
+            continue;
+        }
+
+        let mut compiler = Compiler::new();
+        match compiler.compile(program) {
+            Ok(_) => {},
+            Err(err) => eprintln!("Woops! Compilation failed:\n {}\n", err),
+        }
+        let mut machine = VM::new(compiler.bytecode());
+        match machine.run() {
+            Ok(_) => {},
+            Err(err) => eprintln!("Woops! Executing bytecode failed:\n {}\n", err),
+        }
+
+        let stack_top = machine.stack_top().unwrap();
+        
+        println!("{}", stack_top);
     }
 }
 
