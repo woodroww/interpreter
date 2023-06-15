@@ -1,3 +1,4 @@
+pub mod test_helpers;
 // Interpreter
 pub mod token;
 pub mod lexer;
@@ -10,3 +11,4 @@ pub mod builtins;
 // Compiler
 pub mod code;
 pub mod compiler;
+pub mod vm;

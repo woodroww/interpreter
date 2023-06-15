@@ -1,13 +1,13 @@
-use crate::{code::{Instructions, Opcode}, object::Object, ast::{Program, StatementType, InfixExpression, ExpressionStatement, Expression}};
+use crate::{code::{Instructions, Opcode}, object::Object, ast::{Program, StatementType, InfixExpression, Expression}};
 
-struct Compiler {
+pub struct Compiler {
     instructions: Instructions,
     constants: Vec<Object>,
 }
 
-struct Bytecode {
-    instructions: Instructions,
-    constants: Vec<Object>,
+pub struct Bytecode {
+    pub instructions: Instructions,
+    pub constants: Vec<Object>,
 }
 
 impl Compiler {
@@ -107,9 +107,7 @@ impl Compiler {
 #[cfg(test)]
 mod tests {
     use std::ops::Deref;
-
-    use crate::{code::Opcode, lexer::Lexer, parser::Parser};
-
+    use crate::code::Opcode;
     use super::*;
 
     struct CompilerTestCase {
@@ -135,15 +133,8 @@ mod tests {
     }
 
     fn run_compiler_tests(tests: Vec<CompilerTestCase>) {
-
         for test in tests {
-            let lexer = Lexer::new(&test.input);
-            let mut parser = Parser::new(lexer);
-            let program = parser.parse_program().unwrap();
-            let mut compiler = Compiler::new();
-            compiler.compile(program).unwrap();
-            let bytecode = compiler.bytecode();
-
+            let bytecode = crate::test_helpers::input_to_bytecode(&test.input);
             test_instructions(test.expected_instructions, bytecode.instructions);
             test_constants(test.expected_constants, bytecode.constants);
         }
@@ -185,17 +176,10 @@ mod tests {
         for (i, constant) in expected.iter().enumerate() {
             match constant {
                 Object::Integer(value) => {
-                    test_integer_object(*value, &actual[i]);
+                    crate::test_helpers::test_integer_object(*value, &actual[i]);
                 },
                 _ => todo!(),
             }
-        }
-    }
-
-    fn test_integer_object(expected: isize, obj: &Object) {
-        match obj {
-            Object::Integer(n) => assert_eq!(n, &expected),
-            _ => panic!("expected integer, got {}", obj),
         }
     }
 

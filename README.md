@@ -13,7 +13,8 @@ pub struct Program {
 
 Lexer iterates over chars to produce Tokens.
 Parser iterates over Tokens to produce a Program of StatementType(s).
-Compiler takes a program and generates bytecode.
+Compiler takes a program and generates Bytecode.
+VirtualMachine takes Bytecode, executes instructions.
 
 pub enum StatementType 
     Let(LetStatement),
