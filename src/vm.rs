@@ -32,6 +32,20 @@ impl VM {
                     let const_index = value;
                     self.push(self.constants[const_index as usize].clone());
                 }
+                Opcode::OpAdd => {
+                    let right = self.stack.pop().unwrap();
+                    let left = self.stack.pop().unwrap();
+                    let right_value = match right {
+                        Object::Integer(i) => i,
+                        _ => todo!(),
+                    };
+                    let left_value = match left {
+                        Object::Integer(i) => i,
+                        _ => todo!(),
+                    };
+                    let result = left_value + right_value;
+                    self.push(Object::Integer(result));
+                }
             }
         }
     }
@@ -88,17 +102,20 @@ mod tests {
 
     #[test]
     fn test_integer_arithmetic() {
-        /*
-    tests := []vmTestCase{
-        {"1", 1},
-        {"2", 2},
-        {"1 + 2", 2}, // FIXME
-    }
-        */
-        let tests = vec![VMTestCase {
-            input: "1".to_string(),
-            expected: Object::Integer(1),
-        }];
+        let tests = vec![
+            VMTestCase {
+                input: "1".to_string(),
+                expected: Object::Integer(1),
+            },
+            VMTestCase {
+                input: "2".to_string(),
+                expected: Object::Integer(2),
+            },
+            VMTestCase {
+                input: "1 + 2".to_string(),
+                expected: Object::Integer(3),
+            }
+        ];
         run_vm_tests(tests);
     }
 }

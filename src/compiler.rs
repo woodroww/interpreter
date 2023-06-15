@@ -1,4 +1,4 @@
-use crate::{code::{Instructions, Opcode}, object::Object, ast::{Program, StatementType, InfixExpression, Expression}};
+use crate::{code::{Instructions, Opcode}, object::Object, ast::{Program, StatementType, InfixExpression, Expression}, token::TokenType};
 
 pub struct Compiler {
     instructions: Instructions,
@@ -40,7 +40,7 @@ impl Compiler {
             crate::ast::StatementType::Return(_) => todo!(),
             crate::ast::StatementType::Expression(expresssion_statement) => {
                 match expresssion_statement.expression {
-                    Some(expression) => self.compile_expression(expression),
+                    Some(expression) => self.compile_expression(&expression),
                     None => Ok(())
                 }
             }
@@ -48,13 +48,13 @@ impl Compiler {
         }
     }
 
-    fn compile_expression(&mut self, expression: Expression) -> Result<(), ()> {
+    fn compile_expression(&mut self, expression: &Expression) -> Result<(), ()> {
         match expression {
             Expression::Identifier(_) => todo!(),
             Expression::Prefix(_) => todo!(),
-            Expression::Infix(infix) => self.compile_infix_expression(infix),
+            Expression::Infix(infix) => self.compile_infix_expression(&infix),
             Expression::Int(i) => {
-                let integer_obj = Object::Integer(i);
+                let integer_obj = Object::Integer(*i);
                 let what = self.add_constant(integer_obj);
                 self.emit(Opcode::OpConstant, vec![what]);
                 Ok(())
@@ -72,16 +72,25 @@ impl Compiler {
         }
     }
 
-    fn compile_infix_expression(&mut self, infix: InfixExpression) -> Result<(), ()> {
-        match infix.left {
-            Some(left) => self.compile_expression(*left)?,
+    fn compile_infix_expression(&mut self, infix: &InfixExpression) -> Result<(), ()> {
+        match &infix.left {
+            Some(left) => self.compile_expression(&*left)?,
             None => {}
         }
-        match infix.right {
-            Some(right) => self.compile_expression(*right)?,
+        match &infix.right {
+            Some(right) => self.compile_expression(&*right)?,
             None => {}
         }
-        Ok(())
+        match TokenType::type_from_str(&infix.operator()) {
+            Some(operator) => match operator {
+                TokenType::Plus => {
+                    self.emit(Opcode::OpAdd, vec![]);
+                    Ok(())
+                },
+                _ => panic!("unknown operator {}", infix.operator()),
+            },
+            None => todo!(),
+        }
     }
 
     fn emit(&mut self, op: Opcode, operands: Vec<u16>) -> u16 {
@@ -125,6 +134,7 @@ mod tests {
                 expected_instructions: vec![
                     crate::code::make(Opcode::OpConstant, &vec![0]).unwrap(),
                     crate::code::make(Opcode::OpConstant, &vec![1]).unwrap(),
+                    crate::code::make(Opcode::OpAdd, &vec![]).unwrap(),
                 ],
             }
         ];
@@ -151,17 +161,17 @@ mod tests {
 
     fn test_instructions(expected: Vec<Instructions>, actual: Instructions) {
         let concatted = concat_instructions(expected);
-        println!("jambones actual:   {:?}", actual.0);
-        println!("jambones expected: {:?}", concatted.0);
+        //println!("jambones actual:   {:?}", actual.0);
+        //println!("jambones expected: {:?}", concatted.0);
 
         if actual.len() != concatted.len() {
-            panic!("wrong instructions length.\nwant={:#02x?}\ngot={}",
-                concatted.0, actual);
+            panic!("wrong instructions length.\nwant={}\ngot={}",
+                concatted, actual);
         }
         for ((i, expected), actual) in concatted.iter().enumerate().zip(actual.iter()) {
             if actual != expected {
-                panic!("wrong instruction at {}.\nwant={:?}\ngot={:?}",
-                    i, concatted.0, actual);
+                panic!("wrong instruction at {}.\nwant={}\ngot={}",
+                    i, concatted, actual);
             }
         }
     }
