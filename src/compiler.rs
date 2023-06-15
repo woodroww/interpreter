@@ -1,4 +1,4 @@
-use crate::{code::Instructions, object::Object, ast::{Program, StatementType, InfixExpression, ExpressionStatement, Expression}};
+use crate::{code::{Instructions, Opcode}, object::Object, ast::{Program, StatementType, InfixExpression, ExpressionStatement, Expression}};
 
 struct Compiler {
     instructions: Instructions,
@@ -18,87 +18,23 @@ impl Compiler {
         }
     }
 
-    /*
+    // We append the obj to the end of the compilers constants slice and give it its very own
+    // identifier by returning its index in the constants slice. This identifier will now be used
+    // as the operand for the OpConstant instruction that should cause the VM to load this constant
+    // from the constants pool on to the stack.
+    fn add_constant(&mut self, obj: Object) -> u16 {
+        self.constants.push(obj);
+        (self.constants.len() - 1) as u16
+    }
 
-
-
-pub struct Lexer<'a> {
-    chars: Peekable<Chars<'a>>,
-
-impl<'a> Parser<'a> {
-    pub fn new(lexer: Lexer<'a>) -> Self {
-
-pub struct Program {
-    pub statements: Vec<StatementType>,
-
-Lexer iterates over chars to produce Tokens.
-Parser iterates over Tokens to produce a Program of StatementType(s).
-Compiler takes a program and generates bytecode.
-
-pub enum StatementType 
-    Let(LetStatement),
-        pub struct LetStatement {
-            pub token: Token,
-            pub name: Option<Identifier>,
-            pub value: Option<Expression>,
-        }
-    Return(ReturnStatement),
-        pub struct ReturnStatement {
-            pub token: Token,
-            pub return_value: Option<Expression>,
-        }
-    Expression(ExpressionStatement),
-        pub struct ExpressionStatement {
-            pub token: Token,
-            pub expression: Option<Expression>,
-        }
-            pub enum Expression {
-                Identifier(Identifier),
-                Prefix(PrefixExpression),
-                Infix(InfixExpression),
-                Int(isize),
-                Return,
-                Assign,
-                Boolean(BooleanExpression),
-                If(IfExpression),
-                FunctionLiteral(FunctionLiteralExpression),
-                Call(CallExpression),
-                String(StringLiteral),
-                ArrayLiteral(ArrayLiteral),
-                IndexExpression(IndexExpression),
-                Hash(HashLiteral),
-            }
-    Block(BlockStatement),
-        pub struct BlockStatement {
-            pub token: Token,
-            pub statements: Vec<StatementType>,
-        }
-
-pub struct Instructions(pub Vec<u8>);
-struct Compiler {
-    instructions: Instructions,
-    constants: Vec<Object>,
-}
-struct Bytecode {
-    instructions: Instructions,
-    constants: Vec<Object>,
-}
-Compiler
-    pub fn compile(&self, program: Program) -> Result<(), ()> {
-    pub fn bytecode(&self) -> Bytecode {
-
-
-
-        */
-
-    pub fn compile(&self, program: Program) -> Result<(), ()> {
+    pub fn compile(&mut self, program: Program) -> Result<(), ()> {
         for statement in program.statements {
             self.compile_statement(statement)?;
         }
         Ok(())
     }
 
-    fn compile_statement(&self, statement: StatementType) -> Result<(), ()> {
+    fn compile_statement(&mut self, statement: StatementType) -> Result<(), ()> {
         match statement {
             crate::ast::StatementType::Let(_) => todo!(),
             crate::ast::StatementType::Return(_) => todo!(),
@@ -112,12 +48,17 @@ Compiler
         }
     }
 
-    fn compile_expression(&self, expression: Expression) -> Result<(), ()> {
+    fn compile_expression(&mut self, expression: Expression) -> Result<(), ()> {
         match expression {
             Expression::Identifier(_) => todo!(),
             Expression::Prefix(_) => todo!(),
             Expression::Infix(infix) => self.compile_infix_expression(infix),
-            Expression::Int(_) => todo!(),
+            Expression::Int(i) => {
+                let integer_obj = Object::Integer(i);
+                let what = self.add_constant(integer_obj);
+                self.emit(Opcode::OpConstant, vec![what]);
+                Ok(())
+            },
             Expression::Return => todo!(),
             Expression::Assign => todo!(),
             Expression::Boolean(_) => todo!(),
@@ -131,7 +72,7 @@ Compiler
         }
     }
 
-    fn compile_infix_expression(&self, infix: InfixExpression) -> Result<(), ()> {
+    fn compile_infix_expression(&mut self, infix: InfixExpression) -> Result<(), ()> {
         match infix.left {
             Some(left) => self.compile_expression(*left)?,
             None => {}
@@ -141,6 +82,18 @@ Compiler
             None => {}
         }
         Ok(())
+    }
+
+    fn emit(&mut self, op: Opcode, operands: Vec<u16>) -> u16 {
+        let ins = crate::code::make(op, &operands);
+        self.add_instruction(ins.unwrap())
+    }
+
+    fn add_instruction(&mut self, ins: Instructions) -> u16 {
+        let pos_new_instruction = self.instructions.len();
+        self.instructions.0.extend(ins.iter());
+        // TODO so this datatype I'm not sure what it should be, could it be a usize idk
+        pos_new_instruction as u16
     }
 
     pub fn bytecode(&self) -> Bytecode {
@@ -170,7 +123,7 @@ mod tests {
         let tests = vec![
             CompilerTestCase {
                 input: "1 + 2".to_string(),
-                expected_constants: vec![],
+                expected_constants: vec![Object::Integer(1), Object::Integer(2)],
                 expected_instructions: vec![
                     crate::code::make(Opcode::OpConstant, &vec![0]).unwrap(),
                     crate::code::make(Opcode::OpConstant, &vec![1]).unwrap(),
@@ -187,7 +140,7 @@ mod tests {
             let lexer = Lexer::new(&test.input);
             let mut parser = Parser::new(lexer);
             let program = parser.parse_program().unwrap();
-            let compiler = Compiler::new();
+            let mut compiler = Compiler::new();
             compiler.compile(program).unwrap();
             let bytecode = compiler.bytecode();
 
@@ -223,6 +176,7 @@ mod tests {
     }
 
     fn test_constants(expected: Vec<Object>, actual: Vec<Object>) {
+        println!("test_constants\n\texpected: {:?}\n\tactual: {:?}", expected, actual);
         if actual.len() != expected.len() {
             eprintln!("wrong number of constants.\nwant={:?}\ngot={:?}",
                 expected.len(), actual.len());
