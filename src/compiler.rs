@@ -90,14 +90,32 @@ impl Compiler {
     }
 
     fn compile_infix_expression(&mut self, infix: &InfixExpression) -> Result<(), anyhow::Error> {
-        match &infix.left {
-            Some(left) => self.compile_expression(&*left)?,
-            None => {}
-        }
-        match &infix.right {
-            Some(right) => self.compile_expression(&*right)?,
-            None => {}
-        }
+        match TokenType::type_from_str(&infix.operator()) {
+            Some(operator) => match operator {
+                TokenType::LessThan => {
+                    match &infix.right {
+                        Some(right) => self.compile_expression(&*right)?,
+                        None => {}
+                    }
+                    match &infix.left {
+                        Some(left) => self.compile_expression(&*left)?,
+                        None => {}
+                    }
+                }
+                _ => {
+                    match &infix.left {
+                        Some(left) => self.compile_expression(&*left)?,
+                        None => {}
+                    }
+                    match &infix.right {
+                        Some(right) => self.compile_expression(&*right)?,
+                        None => {}
+                    }
+                }
+            }
+            None => todo!(),
+        };
+
         match TokenType::type_from_str(&infix.operator()) {
             Some(operator) => match operator {
                 TokenType::Plus => {
@@ -116,6 +134,23 @@ impl Compiler {
                     self.emit(Opcode::OpDiv, vec![]);
                     Ok(())
                 }
+                TokenType::GreaterThan => {
+                    self.emit(Opcode::OpGreaterThan, vec![]);
+                    Ok(())
+                }
+                TokenType::LessThan => {
+                    self.emit(Opcode::OpGreaterThan, vec![]);
+                    Ok(())
+                }
+                TokenType::Equal => {
+                    self.emit(Opcode::OpEqual, vec![]);
+                    Ok(())
+                }
+                TokenType::NotEqual => {
+                    self.emit(Opcode::OpNotEqual, vec![]);
+                    Ok(())
+                }
+
                 _ => return Err(anyhow::anyhow!("unknown operator {}", infix.operator())),
             },
             None => todo!(),
@@ -286,6 +321,66 @@ mod tests {
                 expected_constants: vec![],
                 expected_instructions: vec![
                     crate::code::make(Opcode::OpFalse, &vec![]).unwrap(),
+                    crate::code::make(Opcode::OpPop, &vec![]).unwrap(),
+                ],
+            },
+            CompilerTestCase {
+                input: "1 > 2".to_string(),
+                expected_constants: vec![Object::Integer(1), Object::Integer(2)],
+                expected_instructions: vec![
+                    crate::code::make(Opcode::OpConstant, &vec![0]).unwrap(),
+                    crate::code::make(Opcode::OpConstant, &vec![1]).unwrap(),
+                    crate::code::make(Opcode::OpGreaterThan, &vec![]).unwrap(),
+                    crate::code::make(Opcode::OpPop, &vec![]).unwrap(),
+                ],
+            },
+            CompilerTestCase {
+                input: "1 < 2".to_string(),
+                expected_constants: vec![Object::Integer(2), Object::Integer(1)],
+                expected_instructions: vec![
+                    crate::code::make(Opcode::OpConstant, &vec![0]).unwrap(),
+                    crate::code::make(Opcode::OpConstant, &vec![1]).unwrap(),
+                    crate::code::make(Opcode::OpGreaterThan, &vec![]).unwrap(),
+                    crate::code::make(Opcode::OpPop, &vec![]).unwrap(),
+                ],
+            },
+            CompilerTestCase {
+                input: "1 == 2".to_string(),
+                expected_constants: vec![Object::Integer(1), Object::Integer(2)],
+                expected_instructions: vec![
+                    crate::code::make(Opcode::OpConstant, &vec![0]).unwrap(),
+                    crate::code::make(Opcode::OpConstant, &vec![1]).unwrap(),
+                    crate::code::make(Opcode::OpEqual, &vec![]).unwrap(),
+                    crate::code::make(Opcode::OpPop, &vec![]).unwrap(),
+                ],
+            },
+            CompilerTestCase {
+                input: "1 != 2".to_string(),
+                expected_constants: vec![Object::Integer(1), Object::Integer(2)],
+                expected_instructions: vec![
+                    crate::code::make(Opcode::OpConstant, &vec![0]).unwrap(),
+                    crate::code::make(Opcode::OpConstant, &vec![1]).unwrap(),
+                    crate::code::make(Opcode::OpNotEqual, &vec![]).unwrap(),
+                    crate::code::make(Opcode::OpPop, &vec![]).unwrap(),
+                ],
+            },
+            CompilerTestCase {
+                input: "true == false".to_string(),
+                expected_constants: vec![],
+                expected_instructions: vec![
+                    crate::code::make(Opcode::OpTrue, &vec![]).unwrap(),
+                    crate::code::make(Opcode::OpFalse, &vec![]).unwrap(),
+                    crate::code::make(Opcode::OpEqual, &vec![]).unwrap(),
+                    crate::code::make(Opcode::OpPop, &vec![]).unwrap(),
+                ],
+            },
+            CompilerTestCase {
+                input: "true != false".to_string(),
+                expected_constants: vec![],
+                expected_instructions: vec![
+                    crate::code::make(Opcode::OpTrue, &vec![]).unwrap(),
+                    crate::code::make(Opcode::OpFalse, &vec![]).unwrap(),
+                    crate::code::make(Opcode::OpNotEqual, &vec![]).unwrap(),
                     crate::code::make(Opcode::OpPop, &vec![]).unwrap(),
                 ],
             },

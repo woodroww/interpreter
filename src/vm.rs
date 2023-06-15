@@ -48,9 +48,51 @@ impl VM {
                 Opcode::OpFalse => {
                     self.push(Object::Boolean(false));
                 }
+                Opcode::OpEqual | Opcode::OpNotEqual | Opcode::OpGreaterThan => {
+                    self.execute_comparison(op)?;
+                }
             }
         }
         Ok(())
+    }
+
+    fn execute_comparison(&mut self, op: Opcode) -> anyhow::Result<()> {
+        let right = self.pop().unwrap();
+        let left = self.pop().unwrap();
+
+        match (&left, &right) {
+            (Object::Integer(l), Object::Integer(r)) => {
+                return self.execute_integer_comparison(op, *l, *r);
+            }
+            _ => {}
+        }
+
+        match op {
+            Opcode::OpEqual => self.push(self.native_to_boolean_object(right == left)),
+            Opcode::OpNotEqual => self.push(self.native_to_boolean_object(right != left)),
+            _ => return Err(anyhow!("unknown operator: {} ({} {})", op, left.type_string(), right.type_string()))
+        }
+        Ok(())
+    }
+
+    fn execute_integer_comparison(&mut self, op: Opcode, left: isize, right: isize) -> anyhow::Result<()> {
+        match op {
+            Opcode::OpEqual => self.push(self.native_to_boolean_object(right == left)),
+            Opcode::OpNotEqual => self.push(self.native_to_boolean_object(right != left)),
+            Opcode::OpGreaterThan => self.push(self.native_to_boolean_object(left > right)),
+            _ => {
+                return Err(anyhow!("unknown operator {}", op))
+            }
+        }
+        Ok(())
+    }
+    
+    fn native_to_boolean_object(&self, input: bool) -> Object {
+        if input {
+            Object::Boolean(true)
+        } else {
+            Object::Boolean(false) 
+        }
     }
 
     fn execute_binary_operation(&mut self, op: Opcode) -> anyhow::Result<()> {
@@ -205,7 +247,24 @@ mod tests {
     fn test_boolean_expressions() {
         let tests = vec![
             VMTestCase { input: "true".to_string(), expected: Object::Boolean(true) },
-            VMTestCase { input: "false".to_string(), expected: Object::Boolean(false) }
+            VMTestCase { input: "false".to_string(), expected: Object::Boolean(false) },
+            VMTestCase { input: "1 < 2".to_string(), expected: Object::Boolean(true) },
+            VMTestCase { input: "1 > 2".to_string(), expected: Object::Boolean(false) },
+            VMTestCase { input: "1 < 1".to_string(), expected: Object::Boolean(false) },
+            VMTestCase { input: "1 > 1".to_string(), expected: Object::Boolean(false) },
+            VMTestCase { input: "1 == 1".to_string(), expected: Object::Boolean(true) },
+            VMTestCase { input: "1 != 1".to_string(), expected: Object::Boolean(false) },
+            VMTestCase { input: "1 == 2".to_string(), expected: Object::Boolean(false) },
+            VMTestCase { input: "1 != 2".to_string(), expected: Object::Boolean(true) },
+            VMTestCase { input: "true == true".to_string(), expected: Object::Boolean(true) },
+            VMTestCase { input: "false == false".to_string(), expected: Object::Boolean(true) },
+            VMTestCase { input: "true == false".to_string(), expected: Object::Boolean(false) },
+            VMTestCase { input: "true != false".to_string(), expected: Object::Boolean(true) },
+            VMTestCase { input: "false != true".to_string(), expected: Object::Boolean(true) },
+            VMTestCase { input: "(1 < 2) == true".to_string(), expected: Object::Boolean(true) },
+            VMTestCase { input: "(1 < 2) == false".to_string(), expected: Object::Boolean(false) },
+            VMTestCase { input: "(1 > 2) == true".to_string(), expected: Object::Boolean(false) },
+            VMTestCase { input: "(1 > 2) == false".to_string(), expected: Object::Boolean(true) },
         ];
         run_vm_tests(tests);
     }
