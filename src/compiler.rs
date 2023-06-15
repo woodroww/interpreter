@@ -1,4 +1,4 @@
-use crate::{code::Instructions, object::Object, ast::Program};
+use crate::{code::Instructions, object::Object, ast::{Program, StatementType, InfixExpression, ExpressionStatement, Expression}};
 
 struct Compiler {
     instructions: Instructions,
@@ -18,18 +18,128 @@ impl Compiler {
         }
     }
 
+    /*
+
+
+
+pub struct Lexer<'a> {
+    chars: Peekable<Chars<'a>>,
+
+impl<'a> Parser<'a> {
+    pub fn new(lexer: Lexer<'a>) -> Self {
+
+pub struct Program {
+    pub statements: Vec<StatementType>,
+
+Lexer iterates over chars to produce Tokens.
+Parser iterates over Tokens to produce a Program of StatementType(s).
+Compiler takes a program and generates bytecode.
+
+pub enum StatementType 
+    Let(LetStatement),
+        pub struct LetStatement {
+            pub token: Token,
+            pub name: Option<Identifier>,
+            pub value: Option<Expression>,
+        }
+    Return(ReturnStatement),
+        pub struct ReturnStatement {
+            pub token: Token,
+            pub return_value: Option<Expression>,
+        }
+    Expression(ExpressionStatement),
+        pub struct ExpressionStatement {
+            pub token: Token,
+            pub expression: Option<Expression>,
+        }
+            pub enum Expression {
+                Identifier(Identifier),
+                Prefix(PrefixExpression),
+                Infix(InfixExpression),
+                Int(isize),
+                Return,
+                Assign,
+                Boolean(BooleanExpression),
+                If(IfExpression),
+                FunctionLiteral(FunctionLiteralExpression),
+                Call(CallExpression),
+                String(StringLiteral),
+                ArrayLiteral(ArrayLiteral),
+                IndexExpression(IndexExpression),
+                Hash(HashLiteral),
+            }
+    Block(BlockStatement),
+        pub struct BlockStatement {
+            pub token: Token,
+            pub statements: Vec<StatementType>,
+        }
+
+pub struct Instructions(pub Vec<u8>);
+struct Compiler {
+    instructions: Instructions,
+    constants: Vec<Object>,
+}
+struct Bytecode {
+    instructions: Instructions,
+    constants: Vec<Object>,
+}
+Compiler
     pub fn compile(&self, program: Program) -> Result<(), ()> {
-        /*
-        let s = &program.statements[0];
-        match s {
+    pub fn bytecode(&self) -> Bytecode {
+
+
+
+        */
+
+    pub fn compile(&self, program: Program) -> Result<(), ()> {
+        for statement in program.statements {
+            self.compile_statement(statement)?;
+        }
+        Ok(())
+    }
+
+    fn compile_statement(&self, statement: StatementType) -> Result<(), ()> {
+        match statement {
             crate::ast::StatementType::Let(_) => todo!(),
             crate::ast::StatementType::Return(_) => todo!(),
             crate::ast::StatementType::Expression(expresssion_statement) => {
-                self.compile(expresssion_statement.expression);
+                match expresssion_statement.expression {
+                    Some(expression) => self.compile_expression(expression),
+                    None => Ok(())
+                }
             }
             crate::ast::StatementType::Block(_) => todo!(),
         }
-        */
+    }
+
+    fn compile_expression(&self, expression: Expression) -> Result<(), ()> {
+        match expression {
+            Expression::Identifier(_) => todo!(),
+            Expression::Prefix(_) => todo!(),
+            Expression::Infix(infix) => self.compile_infix_expression(infix),
+            Expression::Int(_) => todo!(),
+            Expression::Return => todo!(),
+            Expression::Assign => todo!(),
+            Expression::Boolean(_) => todo!(),
+            Expression::If(_) => todo!(),
+            Expression::FunctionLiteral(_) => todo!(),
+            Expression::Call(_) => todo!(),
+            Expression::String(_) => todo!(),
+            Expression::ArrayLiteral(_) => todo!(),
+            Expression::IndexExpression(_) => todo!(),
+            Expression::Hash(_) => todo!(),
+        }
+    }
+
+    fn compile_infix_expression(&self, infix: InfixExpression) -> Result<(), ()> {
+        match infix.left {
+            Some(left) => self.compile_expression(*left)?,
+            None => {}
+        }
+        match infix.right {
+            Some(right) => self.compile_expression(*right)?,
+            None => {}
+        }
         Ok(())
     }
 

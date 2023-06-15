@@ -275,9 +275,8 @@ impl<'a> Parser<'a> {
 
     pub fn parse_program(&mut self) -> Option<Program> {
         let mut program: Program = Program::new();
-        while let Some(_token) = &self.current_token {
-            let statement = self.parse_statement();
-            if let Some(statement) = statement {
+        while self.current_token.is_some() {
+            if let Some(statement) = self.parse_statement() {
                 program.statements.push(statement);
             }
             self.next_token();
@@ -286,42 +285,45 @@ impl<'a> Parser<'a> {
     }
 
     fn parse_statement(&mut self) -> Option<StatementType> {
-        if self.current_token.is_none() {
-            return None;
+        match self.current_token {
+            Some(ref token) => {
+                match token.token_type {
+                    TokenType::Let => {
+                        match self.parse_let_statement() {
+                            Some(statement) => Some(StatementType::Let(statement)),
+                            None => None,
+                        }
+                    }
+                    TokenType::Return => {
+                        match self.parse_return_statement() {
+                            Some(statement) => Some(StatementType::Return(statement)),
+                            None => None,
+                        }
+                    }
+                    _ => {
+                        match self.parse_expression_statement() {
+                            Some(statement) => Some(StatementType::Expression(statement)),
+                            None => None,
+                        }
+                    }
+                }
+            }
+            None => None,
         }
-        let token = self.current_clone();
-        match token.token_type {
-            TokenType::Let => {
-                if let Some(statement) = self.parse_let_statement() {
-                    return Some(StatementType::Let(statement));
-                }
-            }
-            TokenType::Return => {
-                if let Some(statement) = self.parse_return_statement() {
-                    return Some(StatementType::Return(statement));
-                }
-            }
-            _ => {
-                if let Some(statement) = self.parse_expression_statement() {
-                    return Some(StatementType::Expression(statement));
-                }
-            }
-        }
-        None
     }
 
     fn parse_expression_statement(&mut self) -> Option<ExpressionStatement> {
-        if self.current_token.is_none() {
-            return None;
+        match self.current_token {
+            Some(ref token) => {
+                let mut statement = ExpressionStatement::new(token.clone());
+                statement.expression = self.parse_expression(Precedence::Lowest);
+                if self.peek_token_is(&TokenType::Semicolon) {
+                    self.next_token();
+                }
+                Some(statement)
+            }
+            None => None,
         }
-        let mut statement = ExpressionStatement::new(self.current_clone());
-        statement.expression = self.parse_expression(Precedence::Lowest);
-
-        if self.peek_token_is(&TokenType::Semicolon) {
-            self.next_token();
-        }
-
-        Some(statement)
     }
 
     // page 70
@@ -364,52 +366,6 @@ impl<'a> Parser<'a> {
         }
 
         Some(block)
-    }
-
-    fn no_prefix_parse_fn_error(&mut self, token: Token) {
-        let msg = format!("no prefix parse function found for {}", token);
-        self.errors.push(msg);
-    }
-
-    fn peek_precedence(&self) -> Precedence {
-        let peek = match &self.peek_token {
-            Some(token) => token,
-            None => return Precedence::Lowest,
-        };
-        match self.precedences.get(&peek.token_type) {
-            Some(precedence) => precedence.clone(),
-            None => Precedence::Lowest,
-        }
-    }
-
-    fn current_precedence(&self) -> Precedence {
-        *self
-            .precedences
-            .get(
-                &self
-                    .current_token
-                    .as_ref()
-                    .expect("I'll have to deal with this sometime")
-                    .token_type,
-            )
-            .expect("there should be an entry for this")
-    }
-
-    fn register_prefix(&mut self, token: TokenType, f: ParseFn) {
-        self.prefix_fns.insert(token, f);
-    }
-
-    fn register_infix(&mut self, token: TokenType, f: ParseInfixFn) {
-        self.infix_fns.insert(token, f);
-    }
-
-    pub fn errors(&self) -> Vec<String> {
-        self.errors.clone()
-    }
-
-    fn next_token(&mut self) {
-        self.current_token = std::mem::take(&mut self.peek_token);
-        self.peek_token = self.lexer.next();
     }
 
     fn parse_return_statement(&mut self) -> Option<ReturnStatement> {
@@ -514,6 +470,52 @@ impl<'a> Parser<'a> {
         } else {
             Some(list)
         }
+    }
+
+    fn no_prefix_parse_fn_error(&mut self, token: Token) {
+        let msg = format!("no prefix parse function found for {}", token);
+        self.errors.push(msg);
+    }
+
+    fn peek_precedence(&self) -> Precedence {
+        let peek = match &self.peek_token {
+            Some(token) => token,
+            None => return Precedence::Lowest,
+        };
+        match self.precedences.get(&peek.token_type) {
+            Some(precedence) => precedence.clone(),
+            None => Precedence::Lowest,
+        }
+    }
+
+    fn current_precedence(&self) -> Precedence {
+        *self
+            .precedences
+            .get(
+                &self
+                    .current_token
+                    .as_ref()
+                    .expect("I'll have to deal with this sometime")
+                    .token_type,
+            )
+            .expect("there should be an entry for this")
+    }
+
+    fn register_prefix(&mut self, token: TokenType, f: ParseFn) {
+        self.prefix_fns.insert(token, f);
+    }
+
+    fn register_infix(&mut self, token: TokenType, f: ParseInfixFn) {
+        self.infix_fns.insert(token, f);
+    }
+
+    pub fn errors(&self) -> Vec<String> {
+        self.errors.clone()
+    }
+
+    fn next_token(&mut self) {
+        self.current_token = std::mem::take(&mut self.peek_token);
+        self.peek_token = self.lexer.next();
     }
 
     fn peek_token_is(&self, token: &TokenType) -> bool {
