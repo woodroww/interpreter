@@ -8,6 +8,7 @@ I have not used any global true or false boolean objects.
 
 ## conditionals
 ```
+// condition
 if (5 > 3) {
     // consequence branch
   everythingsFine();
@@ -16,6 +17,9 @@ if (5 > 3) {
   lawsOfUniverseBroken();
 }
 ```
+
+### jumps
+
 
 
 

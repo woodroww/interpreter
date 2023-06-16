@@ -4,10 +4,18 @@ use crate::{
     object::Object,
     token::TokenType,
 };
+use anyhow::anyhow;
+
+pub struct EmittedInstruction {
+    opcode: Opcode,
+    position: usize,
+}
 
 pub struct Compiler {
     instructions: Instructions,
     constants: Vec<Object>,
+    last_instruction: Option<EmittedInstruction>,
+    previous_instruction: Option<EmittedInstruction>,
 }
 
 pub struct Bytecode {
@@ -20,6 +28,8 @@ impl Compiler {
         Self {
             instructions: Instructions::new(),
             constants: Vec::new(),
+            last_instruction: None,
+            previous_instruction: None,
         }
     }
 
@@ -30,6 +40,70 @@ impl Compiler {
     fn add_constant(&mut self, obj: Object) -> u16 {
         self.constants.push(obj);
         (self.constants.len() - 1) as u16
+    }
+    
+    fn last_instruction_is_pop(&self) -> bool {
+        if let Some(last) = &self.last_instruction {
+            last.opcode == Opcode::OpPop
+        } else {
+            false
+        }
+    }
+
+    fn remove_last_pop(&mut self) {
+        let last_position = self.last_instruction.as_ref().unwrap().position;
+        self.instructions.0.drain(last_position..);
+        self.last_instruction = self.previous_instruction.take();
+    }
+
+    fn set_last_instruction(&mut self, opcode: Opcode, position: usize) {
+        let previous = self.last_instruction.take();
+        let last = EmittedInstruction {
+            opcode,
+            position: position.try_into().unwrap(),
+        };
+        self.previous_instruction = previous;
+        self.last_instruction = Some(last);
+    }
+
+    fn emit(&mut self, op: Opcode, operands: Vec<u16>) -> usize {
+        let ins = crate::code::make(op, &operands);
+        let pos = self.add_instruction(ins.unwrap());
+        self.set_last_instruction(op, pos);
+        pos
+    }
+
+    fn add_instruction(&mut self, ins: Instructions) -> usize {
+        let pos_new_instruction = self.instructions.len();
+        self.instructions.0.extend(ins.0.into_iter());
+        pos_new_instruction
+    }
+
+    // replace_instruction and change_operand
+    // The underlying assumption here is that we only replace instructions of the same type, with
+    // the same non-variable length. If that assumption no longer holds, we’d have to tread far
+    // more carefully here and update c.lastInstruction and c.previousInstruction accordingly. You
+    // can see how another IR that’s type-safe and independent of the byte-size of encoded
+    // instructions comes in handy once the compiler and the instructions it emits grow more
+    // complex.
+
+    fn replace_instruction(&mut self, pos: usize, new_instruction: Instructions) {
+        for (i, ins) in new_instruction.0.into_iter().enumerate() {
+            self.instructions.0[pos+i] = ins;
+        }
+    }
+
+    fn change_operand(&mut self, op_pos: usize, operand: u16) {
+        let op: Opcode = self.instructions.0[op_pos].try_into().unwrap();
+        let new_instruction = crate::code::make(op, &vec![operand]).unwrap();
+        self.replace_instruction(op_pos, new_instruction);
+    }
+
+    pub fn bytecode(&self) -> Bytecode {
+        Bytecode {
+            instructions: self.instructions.clone(),
+            constants: self.constants.clone(),
+        }
     }
 
     pub fn compile(&mut self, program: Program) -> Result<(), anyhow::Error> {
@@ -55,7 +129,12 @@ impl Compiler {
                     )),
                 }
             }
-            crate::ast::StatementType::Block(_) => todo!(),
+            crate::ast::StatementType::Block(block) => {
+                for statement in block.statements {
+                    self.compile_statement(statement)?;
+                }
+                Ok(())
+            }
         }
     }
 
@@ -66,7 +145,11 @@ impl Compiler {
                 let operator = prefix.token.literal.as_str();
                 match &prefix.right {
                     Some(expression) => self.compile_expression(&*expression)?,
-                    None => return Err(anyhow::anyhow!("No right expression on a prefix expression")),
+                    None => {
+                        return Err(anyhow::anyhow!(
+                            "No right expression on a prefix expression"
+                        ))
+                    }
                 }
                 match operator {
                     "!" => self.emit(Opcode::OpBang, vec![]),
@@ -91,7 +174,31 @@ impl Compiler {
                 };
                 Ok(())
             }
-            Expression::If(_) => todo!(),
+            Expression::If(if_expression) => {
+                match &if_expression.condition {
+                    Some(condition) => {
+                        self.compile_expression(&condition)?;
+                        let jump_not_truthy_pos = self.emit(Opcode::OpJumpNotTruthy, vec![9999]);
+                        match &if_expression.consequence {
+                            Some(consequence) => {
+                                self.compile_statement(StatementType::Block(*consequence.clone()))?;
+                                if self.last_instruction_is_pop() {
+                                    self.remove_last_pop();
+                                }
+                                let after_consequence_pos = self.instructions.len();
+                                self.change_operand(jump_not_truthy_pos as usize, after_consequence_pos as u16);
+                            }
+
+                            None => {
+                                return Err(anyhow!("if expression has no consequence"));
+                            }
+                        }
+                    }
+                    None => {
+                    }
+                }
+                Ok(())
+            }
             Expression::FunctionLiteral(_) => todo!(),
             Expression::Call(_) => todo!(),
             Expression::String(_) => todo!(),
@@ -124,7 +231,7 @@ impl Compiler {
                         None => {}
                     }
                 }
-            }
+            },
             None => todo!(),
         };
 
@@ -169,24 +276,6 @@ impl Compiler {
         }
     }
 
-    fn emit(&mut self, op: Opcode, operands: Vec<u16>) -> u16 {
-        let ins = crate::code::make(op, &operands);
-        self.add_instruction(ins.unwrap())
-    }
-
-    fn add_instruction(&mut self, ins: Instructions) -> u16 {
-        let pos_new_instruction = self.instructions.len();
-        self.instructions.0.extend(ins.iter());
-        // TODO so this datatype I'm not sure what it should be, could it be a usize idk
-        pos_new_instruction as u16
-    }
-
-    pub fn bytecode(&self) -> Bytecode {
-        Bytecode {
-            instructions: self.instructions.clone(),
-            constants: self.constants.clone(),
-        }
-    }
 }
 
 #[cfg(test)]
@@ -194,6 +283,7 @@ mod tests {
     use super::*;
     use crate::code::Opcode;
     use std::ops::Deref;
+    use pretty_assertions::assert_eq;
 
     struct CompilerTestCase {
         input: String,
@@ -273,7 +363,6 @@ mod tests {
                 ],
             },
         ];
-
         run_compiler_tests(tests);
     }
 
@@ -296,17 +385,15 @@ mod tests {
 
     fn test_instructions(expected: Vec<Instructions>, actual: Instructions) {
         let concatted = concat_instructions(expected);
-        //println!("jambones actual:   {:?}", actual.0);
-        //println!("jambones expected: {:?}", concatted.0);
-
         if actual.len() != concatted.len() {
-            panic!(
+            println!(
                 "wrong instructions length.\nwant={}\ngot={}",
                 concatted, actual
             );
+            assert_eq!(format!("{}", concatted), format!("{}", actual));
         }
-        for ((i, expected), actual) in concatted.iter().enumerate().zip(actual.iter()) {
-            if actual != expected {
+        for ((i, expected_ins), actual_ins) in concatted.iter().enumerate().zip(actual.iter()) {
+            if actual_ins != expected_ins {
                 panic!(
                     "wrong instruction at {}.\nwant={}\ngot={}",
                     i, concatted, actual
@@ -316,7 +403,6 @@ mod tests {
     }
 
     fn test_constants(expected: Vec<Object>, actual: Vec<Object>) {
-        //println!("test_constants\n\texpected: {:?}\n\tactual: {:?}", expected, actual);
         if actual.len() != expected.len() {
             eprintln!(
                 "wrong number of constants.\nwant={:?}\ngot={:?}",
@@ -415,6 +501,30 @@ mod tests {
                 ],
             },
         ];
+        run_compiler_tests(tests);
+    }
+
+    #[test]
+    fn test_conditionals() {
+        let tests = vec![
+            CompilerTestCase {
+                input: "if (true) { 10 }; 3333;".to_string(),
+                expected_constants: vec![Object::Integer(10), Object::Integer(3333)],
+                expected_instructions: vec![
+                    // 0000
+                    crate::code::make(Opcode::OpTrue, &vec![]).unwrap(),
+                    // 0001
+                    crate::code::make(Opcode::OpJumpNotTruthy, &vec![7]).unwrap(),
+                    // 0004
+                    crate::code::make(Opcode::OpConstant, &vec![0]).unwrap(),
+                    // 0007
+                    crate::code::make(Opcode::OpPop, &vec![]).unwrap(),
+                    // 0008
+                    crate::code::make(Opcode::OpConstant, &vec![1]).unwrap(),
+                    // 0011
+                    crate::code::make(Opcode::OpPop, &vec![]).unwrap(),
+                ],
+            }];
         run_compiler_tests(tests);
     }
 }

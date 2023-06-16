@@ -505,10 +505,10 @@ fn is_truthy(object: Object) -> bool {
 
 #[cfg(test)]
 mod test {
-    use std::collections::{BTreeMap, HashMap};
+    use std::collections::HashMap;
 
     use super::*;
-    use crate::{ast::StringLiteral, lexer::Lexer, parser::Parser};
+    use crate::{lexer::Lexer, parser::Parser};
     use pretty_assertions::assert_eq;
 
     fn test_eval(input: &str) -> Option<Object> {

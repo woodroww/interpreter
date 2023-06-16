@@ -1,7 +1,7 @@
 use std::{collections::HashMap, ops::Deref};
 use once_cell::sync::Lazy;
 
-#[derive(Clone)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Instructions(pub Vec<u8>);
 
 impl Instructions {
@@ -30,7 +30,7 @@ impl std::fmt::Display for Instructions {
             let instruction = *self.0.iter().nth(i).unwrap();
             //println!("Display instruction {}", instruction);
             let def = lookup_definition(instruction.try_into().unwrap()).unwrap();
-            let (left, right) = self.0.split_at(i+1);
+            let (_left, right) = self.0.split_at(i+1);
             //println!("Display left {:?} right {:?}", left, right);
             let (operands, read) = read_operands(def, Instructions::from(right.to_vec()));
             let ins_string = format_instruction(def, operands);
@@ -79,6 +79,8 @@ pub enum Opcode {
     OpGreaterThan = 11,
     OpMinus = 12,
     OpBang = 13,
+    OpJumpNotTruthy = 14,
+    OpJump = 15,
 }
 
 // these two (above and below) need to match
@@ -100,6 +102,8 @@ impl TryFrom<u8> for Opcode {
             11 => Ok(Opcode::OpGreaterThan),
             12 => Ok(Opcode::OpMinus),
             13 => Ok(Opcode::OpBang),
+            14 => Ok(Opcode::OpJumpNotTruthy),
+            15 => Ok(Opcode::OpJump),
             _ => Err(format!("invalid Opcode value {}", value)),
         }
     }
@@ -121,6 +125,8 @@ impl std::fmt::Display for Opcode {
             Opcode::OpGreaterThan => write!(f, "OpGreaterThan"),
             Opcode::OpMinus => write!(f, "OpMinus"),
             Opcode::OpBang => write!(f, "OpBang"),
+            Opcode::OpJumpNotTruthy => write!(f, "OpJumpNotTruthy"),
+            Opcode::OpJump => write!(f, "OpJump"),
         }
     }
 }
@@ -225,6 +231,20 @@ static DEFINITIONS: Lazy<HashMap<Opcode, Definition>> = Lazy::new(|| {
             operand_widths: vec![], // no operands
         },
     );
+    map.insert(
+        Opcode::OpJumpNotTruthy,
+        Definition {
+            name: "OpJumpNotTruthy".to_string(),
+            operand_widths: vec![2], // one operand of 2 bytes
+        },
+    );
+    map.insert(
+        Opcode::OpJump,
+        Definition {
+            name: "OpJump".to_string(),
+            operand_widths: vec![2], // one operand of 2 bytes
+        },
+    );
     map
 });
 
@@ -261,19 +281,14 @@ pub fn make(op: Opcode, operands: &Vec<u16>) -> Option<Instructions> {
 }
 
 pub fn read_operands(def: &Definition, ins: Instructions) -> (Vec<u16>, u16) {
-    //println!("read_operands ins: {:?}", ins.0);
-    //println!("read_operands definition: {}, {:?}", def.name, def.operand_widths);
     let mut operands: Vec<u16> = Vec::with_capacity(def.operand_widths.len());
     let mut offset: u16 = 0;
-
-    for (i, width) in def.operand_widths.iter().enumerate() {
+    for width in def.operand_widths.iter() {
         let mut iter = ins.iter().skip(offset.into());
         match width {
             2 => {
                 let (byte_1, byte_2) = (iter.next().unwrap(), iter.next().unwrap());
-                //println!("byte_1: {}, byte_2: {}", byte_1, byte_2);
                 let value = u16::from_be_bytes([*byte_1, *byte_2]);
-                //println!("value from_be_bytes {}", value); 
                 operands.push(value);
             }
             _ => {
@@ -282,7 +297,6 @@ pub fn read_operands(def: &Definition, ins: Instructions) -> (Vec<u16>, u16) {
         }
         offset += *width as u16;
     }
-
     (operands, offset)
 }
 

@@ -61,6 +61,8 @@ impl VM {
                 Opcode::OpBang => {
                     self.execute_bang_operator()?;
                 }
+                Opcode::OpJumpNotTruthy => todo!(),
+                Opcode::OpJump => todo!(),
             }
         }
         Ok(())
