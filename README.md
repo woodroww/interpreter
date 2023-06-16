@@ -5,6 +5,20 @@ block???
 
 I have not used any global true or false boolean objects.
 
+
+## conditionals
+```
+if (5 > 3) {
+    // consequence branch
+  everythingsFine();
+} else {
+    // alternative branch
+  lawsOfUniverseBroken();
+}
+```
+
+
+
 /*
 pub struct Lexer<'a> {
     chars: Peekable<Chars<'a>>,
