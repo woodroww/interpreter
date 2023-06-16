@@ -51,6 +51,8 @@ impl VM {
                 Opcode::OpEqual | Opcode::OpNotEqual | Opcode::OpGreaterThan => {
                     self.execute_comparison(op)?;
                 }
+                Opcode::OpMinus => todo!(),
+                Opcode::OpBang => todo!(),
             }
         }
         Ok(())

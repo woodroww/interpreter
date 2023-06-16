@@ -77,6 +77,8 @@ pub enum Opcode {
     OpEqual = 9,
     OpNotEqual = 10,
     OpGreaterThan = 11,
+    OpMinus = 12,
+    OpBang = 13,
 }
 
 // these two (above and below) need to match
@@ -96,6 +98,8 @@ impl TryFrom<u8> for Opcode {
             9 => Ok(Opcode::OpEqual),
             10 => Ok(Opcode::OpNotEqual),
             11 => Ok(Opcode::OpGreaterThan),
+            12 => Ok(Opcode::OpMinus),
+            13 => Ok(Opcode::OpBang),
             _ => Err(format!("invalid Opcode value {}", value)),
         }
     }
@@ -115,6 +119,8 @@ impl std::fmt::Display for Opcode {
             Opcode::OpEqual => write!(f, "OpEqual"),
             Opcode::OpNotEqual => write!(f, "OpNotEqual"),
             Opcode::OpGreaterThan => write!(f, "OpGreaterThan"),
+            Opcode::OpMinus => write!(f, "OpMinus"),
+            Opcode::OpBang => write!(f, "OpBang"),
         }
     }
 }
@@ -202,6 +208,20 @@ static DEFINITIONS: Lazy<HashMap<Opcode, Definition>> = Lazy::new(|| {
         Opcode::OpGreaterThan,
         Definition {
             name: "OpGreaterThan".to_string(),
+            operand_widths: vec![], // no operands
+        },
+    );
+    map.insert(
+        Opcode::OpMinus,
+        Definition {
+            name: "OpMinus".to_string(),
+            operand_widths: vec![], // no operands
+        },
+    );
+    map.insert(
+        Opcode::OpBang,
+        Definition {
+            name: "OpBang".to_string(),
             operand_widths: vec![], // no operands
         },
     );

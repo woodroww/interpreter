@@ -62,7 +62,19 @@ impl Compiler {
     fn compile_expression(&mut self, expression: &Expression) -> Result<(), anyhow::Error> {
         match expression {
             Expression::Identifier(_) => todo!(),
-            Expression::Prefix(_) => todo!(),
+            Expression::Prefix(prefix) => {
+                let operator = prefix.token.literal.as_str();
+                match &prefix.right {
+                    Some(expression) => self.compile_expression(&*expression)?,
+                    None => return Err(anyhow::anyhow!("No right expression on a prefix expression")),
+                }
+                match operator {
+                    "!" => self.emit(Opcode::OpBang, vec![]),
+                    "-" => self.emit(Opcode::OpMinus, vec![]),
+                    _ => return Err(anyhow::anyhow!("unknown operator {}", operator)),
+                };
+                Ok(())
+            }
             Expression::Infix(infix) => self.compile_infix_expression(&infix),
             Expression::Int(i) => {
                 let integer_obj = Object::Integer(*i);
@@ -239,6 +251,24 @@ mod tests {
                     crate::code::make(Opcode::OpConstant, &vec![0]).unwrap(),
                     crate::code::make(Opcode::OpConstant, &vec![1]).unwrap(),
                     crate::code::make(Opcode::OpDiv, &vec![]).unwrap(),
+                    crate::code::make(Opcode::OpPop, &vec![]).unwrap(),
+                ],
+            },
+            CompilerTestCase {
+                input: "-1".to_string(),
+                expected_constants: vec![Object::Integer(1)],
+                expected_instructions: vec![
+                    crate::code::make(Opcode::OpConstant, &vec![0]).unwrap(),
+                    crate::code::make(Opcode::OpMinus, &vec![]).unwrap(),
+                    crate::code::make(Opcode::OpPop, &vec![]).unwrap(),
+                ],
+            },
+            CompilerTestCase {
+                input: "!true".to_string(),
+                expected_constants: vec![],
+                expected_instructions: vec![
+                    crate::code::make(Opcode::OpTrue, &vec![]).unwrap(),
+                    crate::code::make(Opcode::OpBang, &vec![]).unwrap(),
                     crate::code::make(Opcode::OpPop, &vec![]).unwrap(),
                 ],
             },
